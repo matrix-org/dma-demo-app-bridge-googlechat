@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Google Chat DMA Bridge</string>
+    <string name="intro_header">This is a demonstration of bridging Google Chat to Matrix through a client-side app. Please use a test account to avoid data loss/corruption.</string>
+    <string name="intro_instructions" >"To get started, you'll need to authenticate with Google Chat. Click the button below to send the login URL to yourself and open it on a desktop computer. \n\nOnce open, log in normally and wait until you get to a loading screen. Press F12 on that screen to get to developer tools then visit the Application or Storage tab. \n\nExpand \"Cookies\" and select \"https://accounts.google.com\", find the \"oauth_code\" row and double click on the value. \n\nCopy the value here and press \"Continue\". "</string>
+    <string name="btn_get_login_url">share login url</string>
+    <string name="btn_continue">Continue</string>
+    <string name="txt_oauth_code">Cookie value</string>
+    <string name="toast_missing_auth_code">Please enter the cookie value</string>
+    <string name="toast_invalid_auth_code">That oauth code didn\'t work - try again?</string>
+</resources>
