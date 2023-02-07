@@ -41,7 +41,7 @@ class GChat(public var token: DynamiteToken) {
 //            .addHeader("Connection", "Keep-Alive")
             .addHeader("Authorization", "Bearer ${this.token.accessToken}")
             .addHeader("X-Goog-Encode-Response-If-Executable", "base64")
-            .post(request.toByteArray().toRequestBody())
+            .post(request.toByteArray().toRequestBody(PROTOBUF))
             .build()
         try {
             val response = HTTP_CLIENT.newCall(httpRequest).execute()
