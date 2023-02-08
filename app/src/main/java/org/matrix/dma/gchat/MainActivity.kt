@@ -13,6 +13,7 @@ import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import org.matrix.dma.gchat.lib.*
+import org.matrix.rustcomponents.sdk.crypto.OlmMachine
 import java.security.SecureRandom
 import java.util.*
 
@@ -145,6 +146,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun moveToAppserviceTest() {
+        val hsPrefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE)
+        val hsStoredUrl = hsPrefs.getString(PREF_HOMESERVER_URL, null)
+        if (hsStoredUrl != null) {
+            val accessToken = hsPrefs.getString(PREF_ACCESS_TOKEN, null)!!
+            Thread {
+                // XXX: Don't do this!!
+                // TODO: FIX THIS
+                val client = Matrix(
+                    "syt_ZXhhbXBsZV91c2VyXzE2NzU4MTU5NjM0MDM_iaUBfVhhnwnUQONZSXKC_3kIRj2",
+                    hsStoredUrl
+                )
+                val crypto = MatrixCrypto(client, applicationInfo.dataDir + "/crypto")
+                crypto.runOnce()
+                val roomId = client.createRoom("TEST ROOM - NOT BRIDGED")!!
+                val encrypted = crypto.encryptEvent(client.makeTextEvent("Hello world! This was sent from Android"), roomId)
+                client.sendEvent(encrypted, roomId)
+            }.start()
+        }
+
         setContentView(R.layout.appservice_test_layout)
 
         val hsUrlBox = findViewById<TextView>(R.id.txtHsUrl)
