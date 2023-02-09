@@ -13,6 +13,7 @@ import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import org.matrix.dma.gchat.lib.*
+import org.matrix.dma.gchat.proto.MembershipState
 import org.matrix.rustcomponents.sdk.crypto.OlmMachine
 import java.security.SecureRandom
 import java.util.*
@@ -35,6 +36,7 @@ const val REFRESH_AT_MS_LEFT : Long = 60000
 class MainActivity : AppCompatActivity() {
 
     private val tokenTimer = Timer()
+    private var gchat: GChat? = null
 
     override fun onDestroy() {
         super.onDestroy()
@@ -106,6 +108,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun moveToHomeserverSetup() {
+        // At this stage, we should be able to set up a GChat client
+        this.gchat = GChat(this.readDynamiteToken()!!)
+
         // Quickly make sure we're not having to skip a step
         val hsPrefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE);
         if (hsPrefs.getString(PREF_ACCESS_TOKEN, null) !== null) {
@@ -128,7 +133,7 @@ class MainActivity : AppCompatActivity() {
             prefs.edit()
                 .putString(PREF_ACCESS_TOKEN, asToken)
                 .putString(PREF_APPSERVICE_TOKEN, asToken)
-                .apply()
+                .commit()
 
             val uri = contentResolver.insert(MediaStore.Files.getContentUri("external"), attributes)!!
             val stream = contentResolver.openOutputStream(uri)!!
@@ -149,20 +154,8 @@ class MainActivity : AppCompatActivity() {
         val hsPrefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE)
         val hsStoredUrl = hsPrefs.getString(PREF_HOMESERVER_URL, null)
         if (hsStoredUrl != null) {
-            val accessToken = hsPrefs.getString(PREF_ACCESS_TOKEN, null)!!
-            Thread {
-                // XXX: Don't do this!!
-                // TODO: FIX THIS
-                val client = Matrix(
-                    "syt_ZXhhbXBsZV91c2VyXzE2NzU4MTU5NjM0MDM_iaUBfVhhnwnUQONZSXKC_3kIRj2",
-                    hsStoredUrl
-                )
-                val crypto = MatrixCrypto(client, applicationInfo.dataDir + "/crypto")
-                crypto.runOnce()
-                val roomId = client.createRoom("TEST ROOM - NOT BRIDGED")!!
-                val encrypted = crypto.encryptEvent(client.makeTextEvent("Hello world! This was sent from Android"), roomId)
-                client.sendEvent(encrypted, roomId)
-            }.start()
+            moveToBridgeSync()
+            return
         }
 
         setContentView(R.layout.appservice_test_layout)
@@ -180,8 +173,9 @@ class MainActivity : AppCompatActivity() {
             Thread {
                 val prefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE)
                 val accessToken = prefs.getString(PREF_ACCESS_TOKEN, null)!!
+                val asToken = prefs.getString(PREF_APPSERVICE_TOKEN, accessToken)!!
 
-                val client = Matrix(accessToken, hsUrl)
+                val client = Matrix(accessToken, hsUrl, asToken)
                 try {
                     val realAccessToken = client.ensureRegistered()
                     client.accessToken = realAccessToken
@@ -189,7 +183,7 @@ class MainActivity : AppCompatActivity() {
                     if (whoami != null) {
                         prefs.edit()
                             .putString(PREF_HOMESERVER_URL, hsUrl)
-                            .putString(PREF_ACCESS_TOKEN, realAccessToken).apply()
+                            .putString(PREF_ACCESS_TOKEN, realAccessToken).commit()
                     } else {
                         this.showInvalidHomeserverUrlToast()
                         return@Thread
@@ -200,8 +194,60 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 Log.d("DMA", "Bridging as ${client.whoAmI()} (${client.whichDeviceAmI()}) / ${client.accessToken}")
+                moveToBridgeSync()
             }.start()
         }
+    }
+
+    private fun moveToBridgeSync() {
+        setContentView(R.layout.initial_sync_layout)
+
+        val prefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE)
+        val homeserverUrl = prefs.getString(PREF_HOMESERVER_URL, null)!!
+        val accessToken = prefs.getString(PREF_ACCESS_TOKEN, null)!!
+        val asToken = prefs.getString(PREF_APPSERVICE_TOKEN, accessToken)!!
+        val client = Matrix(
+            "syt_ZXhhbXBsZV91c2VyXzE2NzU4MTU5NjM0MDM_iaUBfVhhnwnUQONZSXKC_3kIRj2",
+            homeserverUrl,
+            asToken
+        )
+
+        val txtStatus = findViewById<TextView>(R.id.txtStatus)
+        txtStatus.text = resources.getText(R.string.sync_from_google)
+        Thread {
+            val crypto = MatrixCrypto(client, applicationInfo.dataDir + "/crypto")
+            crypto.runOnce()
+
+            val toBridge = this.gchat!!.listDmsAndSpaces()
+            txtStatus.text = resources.getString(R.string.bridging_x_chats, toBridge.size)
+            val myId = this.gchat!!.getSelfUserId()
+            for (gspace in toBridge) {
+                if (!gspace.hasGroupId()) continue
+                val roomId = client.createRoom(gspace.roomName, gspace.groupId)!!
+                val memberships = this.gchat!!.getChatMembers(gspace.groupId)
+                val joinedNotUs = memberships.toList().filter { m -> m.membershipState == MembershipState.MEMBER_JOINED && !m.id.memberId.userId.equals(myId) }
+                for (membership in joinedNotUs) {
+                    val member = this.gchat!!.getMember(membership.id.memberId)
+                    val mxid = client.createUser(member.user.userId.id, member.user.name)
+                    client.appserviceJoin(mxid, roomId)
+
+                    // Create the crypto stuff for that user too
+                    val tempAccessToken = prefs.getString(mxid, null)
+                    var tempClient: Matrix?
+                    if (tempAccessToken == null) {
+                        tempClient = client.appserviceLogin(mxid)
+                        prefs.edit().putString(mxid, tempClient.accessToken!!).commit()
+                    } else {
+                        tempClient = Matrix(tempAccessToken, client.homeserverUrl, client.asToken)
+                    }
+                    val tempCrypto = MatrixCrypto(tempClient, applicationInfo.dataDir + "/appservice_users/" + tempClient.getLocalpart())
+                    tempCrypto.runOnce()
+
+                    // DEBUGGING
+                    tempClient.sendEvent(tempCrypto.encryptEvent(tempClient.makeTextEvent("Hello world"), roomId), roomId)
+                }
+            }
+        }.start()
     }
 
     private fun showInvalidHomeserverUrlToast() {
@@ -216,7 +262,7 @@ class MainActivity : AppCompatActivity() {
             .putString(PREF_ACCESS_TOKEN, token.accessToken)
             .putString(PREF_REFRESH_TOKEN, token.refreshToken)
             .putLong(PREF_EXPIRES_TS, token.expiresAt.time)
-            .apply()
+            .commit()
     }
 
     private fun storeDynamiteToken(token: DynamiteToken) {
@@ -224,7 +270,17 @@ class MainActivity : AppCompatActivity() {
         prefs.edit()
             .putString(PREF_ACCESS_TOKEN, token.accessToken)
             .putLong(PREF_EXPIRES_TS, token.expiresAt.time)
-            .apply()
+            .commit()
+    }
+
+    private fun readDynamiteToken(): DynamiteToken? {
+        val prefs = this.getSharedPreferences(PREF_DYNAMITE, MODE_PRIVATE)
+        val accessToken = prefs.getString(PREF_ACCESS_TOKEN, null)
+        val expiresTs = prefs.getLong(PREF_EXPIRES_TS, 0)
+        if (accessToken != null) {
+            return DynamiteToken(accessToken, Date(expiresTs))
+        }
+        return null
     }
 
     private fun checkToken() {
@@ -271,6 +327,9 @@ class MainActivity : AppCompatActivity() {
         if (token != null) {
             this.storeDynamiteToken(token)
             Log.d("DMA", "Got dynamite token")
+            if (this.gchat != null) {
+                this.gchat!!.token = token
+            }
         }
     }
 

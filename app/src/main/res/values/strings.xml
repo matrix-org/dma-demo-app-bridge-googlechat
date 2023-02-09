@@ -16,4 +16,9 @@
     <string name="txt_homeserver_url">Homeserver Client-Server API URL</string>
     <string name="toast_missing_homeserver_url">Please enter a homeserver URL</string>
     <string name="toast_invalid_homeserver_url">That URL didn\'t work - please try again</string>
+    <string name="initial_sync_intro_header">Looks like everything\'s all set! One moment while the app bridges your accounts…</string>
+    <string name="initial_sync_body">This could take a few minutes if you have lots of chats.</string>
+    <string name="please_wait">Please Wait</string>
+    <string name="sync_from_google">Getting your spaces/DMs from Google Chat</string>
+    <string name="bridging_x_chats">Bridging %1$d chats</string>
 </resources>

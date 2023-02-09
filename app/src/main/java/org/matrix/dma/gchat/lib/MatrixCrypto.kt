@@ -29,7 +29,7 @@ class MatrixCrypto {
 
     private fun doKeyUpload(req: Request.KeysUpload) {
         val response = this.client.doRequest(okhttp3.Request.Builder()
-            .url("${this.client.homeserverUrl}/_matrix/client/v3/keys/upload")
+            .url("${this.client.homeserverUrl}/_matrix/client/v3/keys/upload${this.client.getImpersonationQuery("?")}")
             .addHeader("Authorization", "Bearer ${this.client.accessToken}")
             .post(req.body.toRequestBody(JSON))
             .build())!!
@@ -42,7 +42,7 @@ class MatrixCrypto {
             userObject.put(user, JSONArray())
         }
         val response = this.client.doRequest(okhttp3.Request.Builder()
-            .url("${this.client.homeserverUrl}/_matrix/client/v3/keys/query")
+            .url("${this.client.homeserverUrl}/_matrix/client/v3/keys/query${this.client.getImpersonationQuery("?")}")
             .addHeader("Authorization", "Bearer ${this.client.accessToken}")
             .post(JSONObject()
                 .put("device_keys", userObject)
@@ -53,7 +53,7 @@ class MatrixCrypto {
 
     private fun doKeyClaim(req: Request.KeysClaim) {
         val response = this.client.doRequest(okhttp3.Request.Builder()
-            .url("${this.client.homeserverUrl}/_matrix/client/v3/keys/claim")
+            .url("${this.client.homeserverUrl}/_matrix/client/v3/keys/claim${this.client.getImpersonationQuery("?")}")
             .addHeader("Authorization", "Bearer ${this.client.accessToken}")
             .post(JSONObject().put("one_time_keys", JSONObject(req.oneTimeKeys)).toString().toRequestBody(JSON))
             .build())!!
@@ -66,7 +66,7 @@ class MatrixCrypto {
 
     private fun doActualToDevice(requestId: String, eventType: String, body: String) {
         val response = this.client.doRequest(okhttp3.Request.Builder()
-            .url("${this.client.homeserverUrl}/_matrix/client/v3/sendToDevice/${eventType}/${requestId}")
+            .url("${this.client.homeserverUrl}/_matrix/client/v3/sendToDevice/${eventType}/${requestId}${this.client.getImpersonationQuery("?")}")
             .addHeader("Authorization", "Bearer ${this.client.accessToken}")
             .put(JSONObject().put("messages", JSONObject(body)).toString().toRequestBody(JSON))
             .build())!!
@@ -76,6 +76,7 @@ class MatrixCrypto {
     public fun encryptEvent(event: MatrixEvent, roomId: String): MatrixEvent {
         this.runOnce()
         val users = this.client.getJoinedUsers(roomId)!!
+        this.machine.updateTrackedUsers(users)
         val req = this.machine.getMissingSessions(users)
         if (req != null) {
             when (req) {
