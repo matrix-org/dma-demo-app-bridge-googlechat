@@ -1,0 +1,5 @@
+This library, included largely as-is, was retrieved from https://github.com/bidiweb/webchannel
+
+Modifications include:
+* Swapping the Google logger instance out for Android's `Log.d()` call
+* Updating the package name across the library, to fit within the project
