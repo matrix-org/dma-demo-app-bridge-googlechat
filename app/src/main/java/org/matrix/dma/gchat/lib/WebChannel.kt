@@ -24,7 +24,7 @@ class WebChannel(val gChat: GChat) {
 
     public fun register() {
         val url = "https://chat.google.com/webchannel/register".toHttpUrl().newBuilder()
-//            .addQueryParameter("ignore_compass_cookie", "1")
+//            .addQueryParameter("ignore_compass_cookie", "1") // from the web app
         val conn = url.build().toUrl().openConnection() as HttpURLConnection
         conn.requestMethod = "POST"
         conn.setRequestProperty("Authorization", "Bearer ${this.gChat.token.accessToken}")
@@ -40,6 +40,7 @@ class WebChannel(val gChat: GChat) {
         }
 
         // TODO: Is there supposed to be a cookie here?
+        // conn.headerFields["Set-Cookie"]
 
         /*
             // https://github.com/EionRobb/purple-googlechat/blob/master/googlechat_connection.c#L497
@@ -99,6 +100,7 @@ class WebChannel(val gChat: GChat) {
                 for (i in 0 until read) {
                     chunker[i + original.size] = buf[i]
                 }
+                // TODO: Is this even needed, or is it a sign we're doing something wrong with the stream?
                 if (chunker.toString(Charset.forName("UTF-8")).contains("[\"close\"]")) {
                     conn.disconnect()
                     this.doLongPoll()
@@ -147,12 +149,14 @@ class WebChannel(val gChat: GChat) {
         }
         conn.connect()
 
+        // TODO: Even with a 200 OK, is this behaving correctly? Are we sending corrupt data?
         if (conn.responseCode != 200) {
             throw java.lang.RuntimeException("Failed to ping WebChannel")
         }
     }
 
     public fun doLongPoll() {
+        // TODO: Handle disconnect/timeout?
         val url = "https://chat.google.com/webchannel/events_encoded".toHttpUrl().newBuilder()
             .addQueryParameter("VER", "8")
             .addQueryParameter("RID", "rpc")
