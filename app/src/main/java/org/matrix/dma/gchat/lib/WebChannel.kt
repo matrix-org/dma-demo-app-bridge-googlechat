@@ -24,11 +24,13 @@ class WebChannel(val gChat: GChat) {
 
     public fun register() {
         val url = "https://chat.google.com/webchannel/register".toHttpUrl().newBuilder()
-            .addQueryParameter("ignore_compass_cookie", "1")
+//            .addQueryParameter("ignore_compass_cookie", "1")
         val conn = url.build().toUrl().openConnection() as HttpURLConnection
         conn.requestMethod = "POST"
         conn.setRequestProperty("Authorization", "Bearer ${this.gChat.token.accessToken}")
         conn.setRequestProperty("Content-Type", "application/x-protobuf")
+//        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/36.0  Mobile/15E148 Safari/605.1.15")
+//        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36")
         conn.connect()
 
         Log.d("DMA-R", conn.inputStream.readAllBytes().toString(Charset.forName("UTF-8")))

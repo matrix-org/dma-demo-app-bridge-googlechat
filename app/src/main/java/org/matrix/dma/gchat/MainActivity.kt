@@ -111,6 +111,9 @@ class MainActivity : AppCompatActivity() {
         // At this stage, we should be able to set up a GChat client
         this.gchat = GChat(this.readDynamiteToken()!!)
 
+//        moveToBridgeSync()
+//        return
+
         // Quickly make sure we're not having to skip a step
         val hsPrefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE);
         if (hsPrefs.getString(PREF_ACCESS_TOKEN, null) !== null) {
@@ -203,11 +206,16 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.initial_sync_layout)
 
         val prefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE)
+//        prefs.edit()
+//            .putString(PREF_HOMESERVER_URL, "http://172.16.0.111:8338")
+//            .putString(PREF_ACCESS_TOKEN, "syt_ZXhhbXBsZV91c2VyXzE2NzYwNjYxOTAxOTI_QAibkboWXqAQGNtXIFTV_18nJ8F")
+//            .putString(PREF_APPSERVICE_TOKEN, "5620tl97s4w28fqngt3u5zjb3g6ejr51")
+//            .commit()
         val homeserverUrl = prefs.getString(PREF_HOMESERVER_URL, null)!!
         val accessToken = prefs.getString(PREF_ACCESS_TOKEN, null)!!
         val asToken = prefs.getString(PREF_APPSERVICE_TOKEN, accessToken)!!
         val client = Matrix(
-            "syt_ZXhhbXBsZV91c2VyXzE2NzU4MTU5NjM0MDM_iaUBfVhhnwnUQONZSXKC_3kIRj2",
+            "syt_ZXhhbXBsZV91c2VyXzE2NzYwNjYxOTAxOTI_QAibkboWXqAQGNtXIFTV_18nJ8F",
             homeserverUrl,
             asToken
         )
