@@ -1,6 +1,6 @@
 package org.matrix.dma.gchat.extlib.bidiweb.webchannel.client.support.basic;
 
-import com.google.common.net.Uri;
+import okhttp3.HttpUrl;
 
 /**
  * Implementation of WebChannel Uri interface.
@@ -8,14 +8,14 @@ import com.google.common.net.Uri;
  * <p>Light wrapper around Guava Uri to match the WebChannel Support API.
  */
 class BasicWebChannelSupportUri extends org.matrix.dma.gchat.extlib.bidiweb.webchannel.client.support.Support.Uri {
-  private final Uri uri;
+  private final HttpUrl url;
 
-  public BasicWebChannelSupportUri(Uri uri) {
-    this.uri = uri;
+  public BasicWebChannelSupportUri(HttpUrl uri) {
+    this.url = uri;
   }
 
   @Override
   public String toString() {
-    return uri.toString();
+    return url.toString();
   }
 }

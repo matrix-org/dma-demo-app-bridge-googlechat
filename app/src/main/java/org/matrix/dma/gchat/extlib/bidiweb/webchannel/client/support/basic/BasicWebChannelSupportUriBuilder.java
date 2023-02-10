@@ -1,7 +1,8 @@
 package org.matrix.dma.gchat.extlib.bidiweb.webchannel.client.support.basic;
 
-import com.google.common.net.UriBuilder;
 import org.matrix.dma.gchat.extlib.bidiweb.webchannel.client.support.Support;
+
+import okhttp3.HttpUrl;
 
 /**
  * Implementation of WebChannel UriBuilder interface.
@@ -9,13 +10,13 @@ import org.matrix.dma.gchat.extlib.bidiweb.webchannel.client.support.Support;
  * <p>Light wrapper around Guava UriBuilder to match the WebChannel Support API.
  */
 class BasicWebChannelSupportUriBuilder extends Support.UriBuilder {
-  private final UriBuilder builder;
+  private final HttpUrl.Builder builder;
 
   public static BasicWebChannelSupportUriBuilder parse(String url) {
-    return new BasicWebChannelSupportUriBuilder(UriBuilder.parse(url));
+    return new BasicWebChannelSupportUriBuilder(HttpUrl.parse(url).newBuilder());
   }
 
-  private BasicWebChannelSupportUriBuilder(UriBuilder builder) {
+  private BasicWebChannelSupportUriBuilder(HttpUrl.Builder builder) {
     this.builder = builder;
   }
 
@@ -27,17 +28,18 @@ class BasicWebChannelSupportUriBuilder extends Support.UriBuilder {
 
   @Override
   public String getAuthority() {
-    return builder.getAuthority();
+    // XXX: Improper change
+    return builder.toString();
   }
 
   @Override
   public BasicWebChannelSupportUri getUri() {
-    return new BasicWebChannelSupportUri(builder.getUri());
+    return new BasicWebChannelSupportUri(builder.build());
   }
 
   @Override
   public BasicWebChannelSupportUriBuilder clone() {
-    return new BasicWebChannelSupportUriBuilder(builder.clone());
+    return new BasicWebChannelSupportUriBuilder(HttpUrl.parse(builder.toString()).newBuilder());
   }
 
   @Override
