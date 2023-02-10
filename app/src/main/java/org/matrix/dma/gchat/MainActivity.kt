@@ -137,7 +137,7 @@ class MainActivity : AppCompatActivity() {
 
             val uri = contentResolver.insert(MediaStore.Files.getContentUri("external"), attributes)!!
             val stream = contentResolver.openOutputStream(uri)!!
-            stream.write("id: googlechat\nas_token: '$asToken'\nhs_token: '$hsToken'\nurl: null\nrate_limited: false\nsender_localpart: gchat_bot\nnamespaces:\n  users: [{exclusive: true, regex: '@gchat_.+'}, {exclusive: false, regex: '@demo:.+'}]\n  aliases: []\n  rooms: []\n".toByteArray())
+            stream.write("id: googlechat\nas_token: '$asToken'\nhs_token: '$hsToken'\nurl: null\nrate_limited: false\nsender_localpart: gchat_bot\nnamespaces:\n  users: [{exclusive: true, regex: '@gchat_.+'}, {exclusive: false, regex: '@demo:.+'}]\n  aliases: [{exclusive: true, regex: '#gchat_.+'}]\n  rooms: []\n".toByteArray())
             stream.close()
 
             val shareIntent = Intent.createChooser(Intent().apply {
@@ -223,6 +223,11 @@ class MainActivity : AppCompatActivity() {
             val myId = this.gchat!!.getSelfUserId()
             for (gspace in toBridge) {
                 if (!gspace.hasGroupId()) continue
+                val existingRoomId = client.findRoomByChatId(gspace.groupId)
+                if (existingRoomId != null) {
+                    Log.d("DMA", "${gspace.groupId} already has room: $existingRoomId")
+                    continue
+                }
                 val roomId = client.createRoom(gspace.roomName, gspace.groupId)!!
                 val memberships = this.gchat!!.getChatMembers(gspace.groupId)
                 val joinedNotUs = memberships.toList().filter { m -> m.membershipState == MembershipState.MEMBER_JOINED && !m.id.memberId.userId.equals(myId) }
@@ -242,11 +247,14 @@ class MainActivity : AppCompatActivity() {
                     }
                     val tempCrypto = MatrixCrypto(tempClient, applicationInfo.dataDir + "/appservice_users/" + tempClient.getLocalpart())
                     tempCrypto.runOnce()
-
-                    // DEBUGGING
-                    tempClient.sendEvent(tempCrypto.encryptEvent(tempClient.makeTextEvent("Hello world"), roomId), roomId)
+                    tempCrypto.cleanup()
                 }
             }
+
+            // TODO: Bridging existing Matrix rooms goes here
+
+            txtStatus.text = resources.getString(R.string.syncing_gchat)
+            this.gchat!!.startLoop()
         }.start()
     }
 

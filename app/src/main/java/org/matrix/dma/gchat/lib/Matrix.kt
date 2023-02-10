@@ -11,13 +11,13 @@ import org.matrix.dma.gchat.proto.spaceIdOrNull
 import java.util.*
 
 const val HARDCODED_LOCALPART = "demo"
-const val HARDCODED_LOCALPART_PREFIX = "gchat_"
+const val HARDCODED_NAMESPACE_PREFIX = "gchat_"
 
 class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: String) {
     public var actingUserId: String? = null
 
     public fun createUser(id: String, name: String): String {
-        val localpart = "$HARDCODED_LOCALPART_PREFIX$id"
+        val localpart = "$HARDCODED_NAMESPACE_PREFIX$id"
         var req = Request.Builder()
             .url("${this.homeserverUrl}/_matrix/client/v3/register${this.getImpersonationQuery("?")}")
             .addHeader("Authorization", "Bearer ${this.asToken}")
@@ -186,6 +186,22 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
                 .toString().toRequestBody(JSON)
             ).build()
         return this.doRequest(req)?.getString("room_id")
+    }
+
+    public fun getAliasLocalpartForId(chatId: GroupId): String {
+        return if (chatId.spaceIdOrNull != null) "space_${chatId.spaceId.spaceId}"
+        else if (chatId.dmIdOrNull != null) "dm_${chatId.dmId.dmId}"
+        else throw java.lang.RuntimeException("invalid chat ID: unknown type")
+    }
+
+    public fun findRoomByChatId(chatId: GroupId): String? {
+        val alias = "%23${this.getAliasLocalpartForId(chatId)}:${this.getDomain()}" // XXX: We should just escape properly...
+        val req = Request.Builder()
+            .url("${this.homeserverUrl}/_matrix/client/v3/directory/${alias}${this.getImpersonationQuery("?")}")
+            .addHeader("Authorization", "Bearer ${this.accessToken}")
+            .get()
+            .build()
+        return this.doRequest(req)?.optString("room_id")
     }
 
     public fun sendEvent(event: MatrixEvent, roomId: String): String? {

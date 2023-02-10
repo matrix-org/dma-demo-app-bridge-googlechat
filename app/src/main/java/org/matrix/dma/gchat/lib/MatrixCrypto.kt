@@ -14,6 +14,10 @@ class MatrixCrypto {
         this.machine = OlmMachine(this.client.whoAmI()!!, this.client.whichDeviceAmI()!!, storagePath, null)
     }
 
+    public fun cleanup() {
+        this.machine.destroy()
+    }
+
     public fun runOnce() {
         val requests = this.machine.outgoingRequests()
         for (request in requests) {
@@ -61,16 +65,12 @@ class MatrixCrypto {
     }
 
     private fun doToDevice(req: Request.ToDevice) {
-        this.doActualToDevice(req.requestId, req.eventType, req.body)
-    }
-
-    private fun doActualToDevice(requestId: String, eventType: String, body: String) {
         val response = this.client.doRequest(okhttp3.Request.Builder()
-            .url("${this.client.homeserverUrl}/_matrix/client/v3/sendToDevice/${eventType}/${requestId}${this.client.getImpersonationQuery("?")}")
+            .url("${this.client.homeserverUrl}/_matrix/client/v3/sendToDevice/${req.eventType}/${req.requestId}${this.client.getImpersonationQuery("?")}")
             .addHeader("Authorization", "Bearer ${this.client.accessToken}")
-            .put(JSONObject().put("messages", JSONObject(body)).toString().toRequestBody(JSON))
+            .put(JSONObject().put("messages", JSONObject(req.body)).toString().toRequestBody(JSON))
             .build())!!
-        this.machine.markRequestAsSent(requestId, RequestType.TO_DEVICE, response.toString())
+        this.machine.markRequestAsSent(req.requestId, RequestType.TO_DEVICE, response.toString())
     }
 
     public fun encryptEvent(event: MatrixEvent, roomId: String): MatrixEvent {
@@ -95,7 +95,7 @@ class MatrixCrypto {
         ))
         for (tdReq in reqs) {
             when (tdReq) {
-                is Request.ToDevice -> this.doActualToDevice(tdReq.requestId, tdReq.eventType, tdReq.body)
+                is Request.ToDevice -> this.doToDevice(tdReq)
                 else -> throw java.lang.RuntimeException("Invalid state: expected a ToDevice request")
             }
         }

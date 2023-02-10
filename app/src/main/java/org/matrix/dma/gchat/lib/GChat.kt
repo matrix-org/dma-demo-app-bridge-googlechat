@@ -21,6 +21,14 @@ val CHAT_REQUEST_HEADER = requestHeader {
 }
 
 class GChat(public var token: DynamiteToken) {
+    val channel = BrowserChannel(this)
+
+    public fun startLoop() {
+        Thread {
+            this.channel.start()
+        }.start()
+    }
+
     public fun listDmsAndSpaces(): List<WorldItemLite> {
         val request = paginatedWorldRequest {
             requestHeader = CHAT_REQUEST_HEADER

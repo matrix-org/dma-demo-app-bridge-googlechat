@@ -4,7 +4,6 @@ import android.util.Log
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
-import okio.IOException
 import org.json.JSONObject
 import java.net.CookieManager
 import java.net.CookiePolicy
@@ -20,9 +19,7 @@ const val REQUEST_URL = "https://accounts.google.com/o/oauth2/token"
 val LOGIN_URL = "https://accounts.google.com/o/oauth2/programmatic_auth?client_id=$CLIENT_ID&device_name=DMA_Bridge&scope=" + SCOPES.joinToString("+")
 
 inline fun makeCookieManager(): CookieManager {
-    val manager = CookieManager()
-    manager.setCookiePolicy(CookiePolicy.ACCEPT_ALL)
-    return manager
+    return CookieManager(null, CookiePolicy.ACCEPT_ALL)
 }
 val HTTP_CLIENT = OkHttpClient.Builder().cookieJar(JavaNetCookieJar(makeCookieManager())).build()
 val JSON = "application/json; charset=utf-8".toMediaType()

@@ -21,4 +21,5 @@
     <string name="please_wait">Please Wait</string>
     <string name="sync_from_google">Getting your spaces/DMs from Google Chat</string>
     <string name="bridging_x_chats">Bridging %1$d chats</string>
+    <string name="syncing_gchat">Starting up the Google Chat sync loop…</string>
 </resources>
