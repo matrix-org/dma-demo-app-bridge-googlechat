@@ -22,10 +22,13 @@ val CHAT_REQUEST_HEADER = requestHeader {
 
 class GChat(public var token: DynamiteToken) {
     val channel = BrowserChannel(this)
+    val ch = WebChannel(this)
 
     public fun startLoop() {
         Thread {
-            this.channel.start()
+//            this.channel.start()
+            this.ch.register()
+            this.ch.fetchSessionId()
         }.start()
     }
 
