@@ -163,6 +163,7 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
             .post(JSONObject()
                 .put("preset", "private_chat")
                 .put("name", name)
+                .put("room_alias_name", this.getAliasLocalpartForId(chatId))
                 .put("initial_state", JSONArray().put(JSONObject()
                     .put("type", "m.room.encryption")
                     .put("state_key", "")
@@ -197,7 +198,7 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
     public fun findRoomByChatId(chatId: GroupId): String? {
         val alias = "%23${this.getAliasLocalpartForId(chatId)}:${this.getDomain()}" // XXX: We should just escape properly...
         val req = Request.Builder()
-            .url("${this.homeserverUrl}/_matrix/client/v3/directory/${alias}${this.getImpersonationQuery("?")}")
+            .url("${this.homeserverUrl}/_matrix/client/v3/directory/room/${alias}${this.getImpersonationQuery("?")}")
             .addHeader("Authorization", "Bearer ${this.accessToken}")
             .get()
             .build()

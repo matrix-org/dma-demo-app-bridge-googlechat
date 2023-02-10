@@ -224,7 +224,7 @@ class MainActivity : AppCompatActivity() {
             for (gspace in toBridge) {
                 if (!gspace.hasGroupId()) continue
                 val existingRoomId = client.findRoomByChatId(gspace.groupId)
-                if (existingRoomId != null) {
+                if (existingRoomId != null && existingRoomId.isNotEmpty()) {
                     Log.d("DMA", "${gspace.groupId} already has room: $existingRoomId")
                     continue
                 }
