@@ -330,6 +330,7 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
         Thread {
             var nextBatch: String? = null
             val filterId = this.registerFilter()
+            val myUserId = this.whoAmI()
 
             // TODO: Add a way to stop this madness
             while (true) {
@@ -374,6 +375,7 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
                                 for (j in decrypted.keys()) {
                                     copiedEvent.put(j, decrypted.get(j))
                                 }
+                                memberEvent.put("X-myUserId", myUserId)
                                 copiedEvent.put("X-sender", memberEvent) // for bridging purposes
                                 onMessageCallback(copiedEvent, idEvent)
                             }

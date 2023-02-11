@@ -13,11 +13,11 @@ import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import org.matrix.dma.gchat.lib.*
-import org.matrix.dma.gchat.proto.MembershipState
 import org.matrix.rustcomponents.sdk.crypto.OlmMachine
 import java.security.SecureRandom
 import java.util.*
 import org.json.JSONObject
+import org.matrix.dma.gchat.proto.*
 
 // Buckets
 const val PREF_TOKEN = "token";
@@ -268,11 +268,33 @@ class MainActivity : AppCompatActivity() {
             txtStatus.text = resources.getString(R.string.syncing_matrix)
             this.matrix!!.startSyncLoop(this.mxCrypto!!, { ev, id ->
                 Log.d("DMA", "Got message: $ev\n\n$id")
+                val chatId = this.stateIdToChatId(id)
+                val senderInfo = ev.getJSONObject("X-sender")
+                var text = ev.getJSONObject("content").getString("body")
+                if (senderInfo.getString("X-myUserId") != ev.getString("sender")) {
+                    val displayName = senderInfo.optString("displayname")
+                    text = (if (displayName.isNotEmpty()) "<$displayName>: " else  "<${ev.getString("sender")}>: ") + text
+                }
+                this.gchat?.sendMessage(chatId, text)
             }, { roomId, state ->
                 Log.d("DMA", "Got room: $roomId\n\n$state")
                 return@startSyncLoop JSONObject()
             })
         }.start()
+    }
+
+    private fun stateIdToChatId(id: JSONObject): GroupId {
+        val mxDmId = id.optString("dm_id")
+        val mxSpaceId = id.optString("space_id")
+        if (mxDmId.isNotEmpty()) {
+            return groupId {
+                dmId = dmId { dmId = mxDmId }
+            }
+        } else {
+            return groupId {
+                spaceId = spaceId { spaceId = mxSpaceId }
+            }
+        }
     }
 
     private fun showInvalidHomeserverUrlToast() {

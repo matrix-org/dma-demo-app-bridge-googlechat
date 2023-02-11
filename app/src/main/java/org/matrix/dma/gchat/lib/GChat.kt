@@ -7,6 +7,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.matrix.dma.gchat.proto.*
+import java.util.*
 
 const val CHAT_API_URL = "https://chat.google.com"
 const val CHAT_API_KEY = "AIzaSyD7InnYR3VKdb4j2rMUEbTCIr2VyEazl6k"
@@ -71,6 +72,20 @@ class GChat(public var token: DynamiteToken) {
         val raw = this.pbRequest("list_members", request)
         val response = ListMembersResponse.parseFrom(ByteString.copyFrom(raw))
         return response.membershipsList
+    }
+
+    public fun sendMessage(id: GroupId, text: String) {
+        val request = createTopicRequest {
+            requestHeader = CHAT_REQUEST_HEADER
+            groupId = id
+            localId = "${Date().time}-matrix"
+            textBody = text
+            historyV2 = true
+            messageInfo = messageInfo {
+                acceptFormatAnnotations = true
+            }
+        }
+        this.pbRequest("create_topic", request)
     }
 
     private fun pbRequest(name: String, request: GeneratedMessageV3) : ByteArray? {
