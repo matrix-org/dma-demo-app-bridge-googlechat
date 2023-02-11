@@ -13,7 +13,7 @@ class DynamiteAuth {
                 .put("app_id", "com.google.Dynamite")
                 .put(
                     "client_id",
-                    "redacted"
+                    "576267593750-sbi1m7khesgfh1e0f2nv5vqlfa4qr72m.apps.googleusercontent.com"
                 )
                 .put("passcode_present", "YES")
                 .put("response_type", "token")
