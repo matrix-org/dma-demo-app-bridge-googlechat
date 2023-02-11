@@ -335,6 +335,7 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
             // TODO: Add a way to stop this madness
             while (true) {
                 val res = this.doSync(nextBatch, filterId)
+                val isFirstSync = nextBatch == null
                 nextBatch = res.getString("next_batch")
 
                 // send the sync request through our crypto
@@ -348,6 +349,11 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
                     var idEvent = this.getStateEvent(roomId, MATRIX_NAMESPACE, "")
                     if (idEvent == null) {
                         idEvent = onRoomCallback(roomId, state)
+                    }
+
+                    if (isFirstSync) {
+                        // Don't process messages yet (we'll happily drop whatever was missed if it means not spamming the chat)
+                        continue
                     }
 
                     // XXX: We should probably handle gappy timelines, but meh
