@@ -8,6 +8,7 @@ import org.json.JSONObject
 import java.net.CookieManager
 import java.net.CookiePolicy
 import java.util.Date
+import java.util.concurrent.TimeUnit
 
 const val CLIENT_ID = "936475272427.apps.googleusercontent.com"
 const val CLIENT_SECRET = "KWsJlkaMn1jGLxQpWxMnOox-"
@@ -21,7 +22,9 @@ val LOGIN_URL = "https://accounts.google.com/o/oauth2/programmatic_auth?client_i
 inline fun makeCookieManager(): CookieManager {
     return CookieManager(null, CookiePolicy.ACCEPT_ALL)
 }
-val HTTP_CLIENT = OkHttpClient.Builder().cookieJar(JavaNetCookieJar(makeCookieManager())).build()
+val HTTP_CLIENT = OkHttpClient.Builder().cookieJar(JavaNetCookieJar(makeCookieManager()))
+    .readTimeout(30L, TimeUnit.SECONDS)
+    .build()
 val JSON = "application/json; charset=utf-8".toMediaType()
 
 class TokenAuth {

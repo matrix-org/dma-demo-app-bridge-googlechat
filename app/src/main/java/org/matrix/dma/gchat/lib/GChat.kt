@@ -25,6 +25,7 @@ class GChat(public var token: DynamiteToken) {
     val ch = WebChannel(this) // Second attempt at implementation
 
     public fun startLoop() {
+        return; // Disabled for ease of development
         Thread {
 //            this.channel.start()
             this.ch.register()

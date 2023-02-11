@@ -17,6 +17,7 @@ import org.matrix.dma.gchat.proto.MembershipState
 import org.matrix.rustcomponents.sdk.crypto.OlmMachine
 import java.security.SecureRandom
 import java.util.*
+import org.json.JSONObject
 
 // Buckets
 const val PREF_TOKEN = "token";
@@ -37,6 +38,8 @@ class MainActivity : AppCompatActivity() {
 
     private val tokenTimer = Timer()
     private var gchat: GChat? = null
+    private var matrix: Matrix? = null
+    private var mxCrypto: MatrixCrypto? = null
 
     override fun onDestroy() {
         super.onDestroy()
@@ -214,7 +217,7 @@ class MainActivity : AppCompatActivity() {
         val homeserverUrl = prefs.getString(PREF_HOMESERVER_URL, null)!!
         val accessToken = prefs.getString(PREF_ACCESS_TOKEN, null)!!
         val asToken = prefs.getString(PREF_APPSERVICE_TOKEN, accessToken)!!
-        val client = Matrix(
+        this.matrix = Matrix(
             "syt_ZXhhbXBsZV91c2VyXzE2NzYwNjYxOTAxOTI_QAibkboWXqAQGNtXIFTV_18nJ8F",
             homeserverUrl,
             asToken
@@ -223,35 +226,35 @@ class MainActivity : AppCompatActivity() {
         val txtStatus = findViewById<TextView>(R.id.txtStatus)
         txtStatus.text = resources.getText(R.string.sync_from_google)
         Thread {
-            val crypto = MatrixCrypto(client, applicationInfo.dataDir + "/crypto")
-            crypto.runOnce()
+            this.mxCrypto = MatrixCrypto(this.matrix!!, applicationInfo.dataDir + "/crypto")
+            this.mxCrypto!!.runOnce()
 
             val toBridge = this.gchat!!.listDmsAndSpaces()
             txtStatus.text = resources.getString(R.string.bridging_x_chats, toBridge.size)
             val myId = this.gchat!!.getSelfUserId()
             for (gspace in toBridge) {
                 if (!gspace.hasGroupId()) continue
-                val existingRoomId = client.findRoomByChatId(gspace.groupId)
+                val existingRoomId = this.matrix!!.findRoomByChatId(gspace.groupId)
                 if (existingRoomId != null && existingRoomId.isNotEmpty()) {
                     Log.d("DMA", "${gspace.groupId} already has room: $existingRoomId")
                     continue
                 }
-                val roomId = client.createRoom(gspace.roomName, gspace.groupId)!!
+                val roomId = this.matrix!!.createRoom(gspace.roomName, gspace.groupId)!!
                 val memberships = this.gchat!!.getChatMembers(gspace.groupId)
                 val joinedNotUs = memberships.toList().filter { m -> m.membershipState == MembershipState.MEMBER_JOINED && !m.id.memberId.userId.equals(myId) }
                 for (membership in joinedNotUs) {
                     val member = this.gchat!!.getMember(membership.id.memberId)
-                    val mxid = client.createUser(member.user.userId.id, member.user.name)
-                    client.appserviceJoin(mxid, roomId)
+                    val mxid = this.matrix!!.createUser(member.user.userId.id, member.user.name)
+                    this.matrix!!.appserviceJoin(mxid, roomId)
 
                     // Create the crypto stuff for that user too
                     val tempAccessToken = prefs.getString(mxid, null)
                     var tempClient: Matrix?
                     if (tempAccessToken == null) {
-                        tempClient = client.appserviceLogin(mxid)
+                        tempClient = this.matrix!!.appserviceLogin(mxid)
                         prefs.edit().putString(mxid, tempClient.accessToken!!).commit()
                     } else {
-                        tempClient = Matrix(tempAccessToken, client.homeserverUrl, client.asToken)
+                        tempClient = Matrix(tempAccessToken, this.matrix!!.homeserverUrl, this.matrix!!.asToken)
                     }
                     val tempCrypto = MatrixCrypto(tempClient, applicationInfo.dataDir + "/appservice_users/" + tempClient.getLocalpart())
                     tempCrypto.runOnce()
@@ -259,10 +262,16 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // TODO: Bridging existing Matrix rooms goes here
-
             txtStatus.text = resources.getString(R.string.syncing_gchat)
             this.gchat!!.startLoop()
+
+            txtStatus.text = resources.getString(R.string.syncing_matrix)
+            this.matrix!!.startSyncLoop(this.mxCrypto!!, { ev, id ->
+                Log.d("DMA", "Got message: $ev\n\n$id")
+            }, { roomId, state ->
+                Log.d("DMA", "Got room: $roomId\n\n$state")
+                return@startSyncLoop JSONObject()
+            })
         }.start()
     }
 

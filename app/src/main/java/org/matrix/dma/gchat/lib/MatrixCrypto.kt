@@ -1,5 +1,6 @@
 package org.matrix.dma.gchat.lib
 
+import android.util.Log
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
@@ -16,6 +17,31 @@ class MatrixCrypto {
 
     public fun cleanup() {
         this.machine.destroy()
+    }
+
+    public fun consumeSync(sync: JSONObject) {
+        val toDeviceEvents = sync.optJSONObject("to_device")?.getJSONArray("events")
+        val deviceLists = sync.optJSONObject("device_lists")
+        val changed = deviceLists?.optJSONArray("changed")
+        val left = deviceLists?.optJSONArray("left")
+        val otks = sync.optJSONObject("device_one_time_keys_count")
+        val unusedKeys = sync.optJSONArray("device_unused_fallback_key_types")
+        this.machine.receiveSyncChanges(
+            (JSONObject().put("events", toDeviceEvents ?: JSONArray())).toString(),
+            DeviceLists(arrayToList(changed ?: JSONArray()), arrayToList(left ?: JSONArray())),
+            objectToMap(otks ?: JSONObject()),
+            arrayToList(unusedKeys ?: JSONArray())
+        )
+    }
+
+    public fun decrypt(event: JSONObject, roomId: String): JSONObject? {
+        try {
+            val decrypted = this.machine.decryptRoomEvent(event.toString(), roomId, false)
+            return JSONObject(decrypted.clearEvent)
+        } catch (ex: Exception) {
+            Log.e("DMA", "Error decrypting event: $ex")
+        }
+        return null
     }
 
     public fun runOnce() {
@@ -104,4 +130,22 @@ class MatrixCrypto {
         this.runOnce()
         return MatrixEvent("m.room.encrypted", encrypted, null)
     }
+}
+
+fun <T> arrayToList(arr: JSONArray): List<T> {
+    val list = ArrayList<T>()
+    for (i in 0 until arr.length()) {
+        @Suppress("UNCHECKED_CAST")
+        list.add(arr.get(i) as T)
+    }
+    return list
+}
+
+fun <K, V> objectToMap(obj: JSONObject): Map<K, V> {
+    val map = HashMap<K, V>()
+    for (k in obj.keys()) {
+        @Suppress("UNCHECKED_CAST")
+        map[k as K] = obj.get(k) as V
+    }
+    return map
 }
