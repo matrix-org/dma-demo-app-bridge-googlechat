@@ -153,6 +153,8 @@ class MainActivity : AppCompatActivity() {
                 type = "text/plain"
             }, null)
             startActivity(shareIntent)
+
+            moveToAppserviceTest()
         }
     }
 
@@ -200,7 +202,9 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 Log.d("DMA", "Bridging as ${client.whoAmI()} (${client.whichDeviceAmI()}) / ${client.accessToken}")
-                moveToBridgeSync()
+                Handler(this.mainLooper).post {
+                    moveToBridgeSync()
+                }
             }.start()
         }
     }
