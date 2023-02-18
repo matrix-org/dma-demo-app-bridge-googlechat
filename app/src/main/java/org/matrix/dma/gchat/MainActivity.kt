@@ -13,7 +13,6 @@ import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import org.matrix.dma.gchat.lib.*
-import org.matrix.rustcomponents.sdk.crypto.OlmMachine
 import java.security.SecureRandom
 import java.util.*
 import org.json.JSONObject
@@ -215,14 +214,14 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE)
 //        prefs.edit()
 //            .putString(PREF_HOMESERVER_URL, "http://172.16.0.111:8338")
-//            .putString(PREF_ACCESS_TOKEN, "syt_ZXhhbXBsZV91c2VyXzE2NzYwNjYxOTAxOTI_QAibkboWXqAQGNtXIFTV_18nJ8F")
+//            .putString(PREF_ACCESS_TOKEN, "syt_ZXhhbXBsZV91c2VyXzE2NzYwNjYxOTAxOTI_NEPqZQauibIQpOsxySNF_094Zhx")
 //            .putString(PREF_APPSERVICE_TOKEN, "5620tl97s4w28fqngt3u5zjb3g6ejr51")
 //            .commit()
         val homeserverUrl = prefs.getString(PREF_HOMESERVER_URL, null)!!
         val accessToken = prefs.getString(PREF_ACCESS_TOKEN, null)!!
         val asToken = prefs.getString(PREF_APPSERVICE_TOKEN, accessToken)!!
         this.matrix = Matrix(
-            "syt_ZXhhbXBsZV91c2VyXzE2NzYwNjYxOTAxOTI_QAibkboWXqAQGNtXIFTV_18nJ8F",
+            "syt_ZXhhbXBsZV91c2VyXzE2NzYwNjYxOTAxOTI_NEPqZQauibIQpOsxySNF_094Zhx",
             homeserverUrl,
             asToken
         )
@@ -232,6 +231,11 @@ class MainActivity : AppCompatActivity() {
         Thread {
             this.mxCrypto = MatrixCrypto(this.matrix!!, applicationInfo.dataDir + "/crypto")
             this.mxCrypto!!.runOnce()
+
+            val oldActingId = this.matrix!!.actingUserId
+            val oldAccessToken = this.matrix!!.accessToken
+            this.matrix!!.actingUserId = this.matrix!!.whoAmI()
+            this.matrix!!.accessToken = asToken
 
             val toBridge = this.gchat!!.listDmsAndSpaces()
             txtStatus.text = resources.getString(R.string.bridging_x_chats, toBridge.size)
@@ -266,6 +270,9 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            this.matrix!!.actingUserId = oldActingId
+            this.matrix!!.accessToken = oldAccessToken
+
             txtStatus.text = resources.getString(R.string.syncing_gchat)
             this.gchat!!.startLoop()
 
@@ -281,8 +288,28 @@ class MainActivity : AppCompatActivity() {
                 }
                 this.gchat?.sendMessage(chatId, text)
             }, { roomId, state ->
-                Log.d("DMA", "Got room: $roomId\n\n$state")
-                return@startSyncLoop JSONObject()
+                var mxName = "NoNameRoom"
+                for (i in 0 until state.length()) {
+                    val event = state.getJSONObject(i)
+                    if (event.getString("type") == "m.room.name") {
+                        mxName = event.getJSONObject("content").optString("name", "NoNameRoom")
+                        break
+                    }
+                }
+
+                if (mxName.isEmpty()) {
+                    mxName = roomId
+                }
+
+                Log.d("DMA", "Attempting to assign a new chat ID to $roomId ($mxName)")
+                val groupId = this.gchat!!.createSpace(mxName)
+                val content = JSONObject()
+                    .put("space_id", groupId.spaceIdOrNull?.spaceId)
+                    .put("dm_id", groupId.dmIdOrNull?.dmId)
+                this.matrix!!.assignChatIdToRoom(groupId, roomId)
+                this.matrix!!.sendStateEvent(roomId, MATRIX_NAMESPACE, "", content)
+                Log.d("DMA", "Assigned $groupId to $roomId")
+                return@startSyncLoop content
             })
         }.start()
     }

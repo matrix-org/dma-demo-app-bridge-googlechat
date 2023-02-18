@@ -7,6 +7,11 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.matrix.dma.gchat.proto.*
+import org.matrix.dma.gchat.proto.SpaceCreationInfo.FlatGroup
+import org.matrix.dma.gchat.proto.SpaceCreationInfo.SpaceType
+import org.matrix.dma.gchat.proto.SpaceCreationInfoKt.flatGroup
+import org.matrix.dma.gchat.proto.SpaceCreationInfoKt.spaceType
+import org.matrix.dma.gchat.proto.SpaceCreationInfoKt.threadedGroup
 import java.util.*
 
 const val CHAT_API_URL = "https://chat.google.com"
@@ -86,6 +91,24 @@ class GChat(public var token: DynamiteToken) {
             }
         }
         this.pbRequest("create_topic", request)
+    }
+
+    public fun createSpace(spaceName: String): GroupId {
+        val request = createGroupRequest {
+            requestHeader = CHAT_REQUEST_HEADER
+            shouldFindExistingSpace = false
+//            localId = "test1234"
+            space = spaceCreationInfo {
+                name = spaceName
+                hasServerGeneratedName = false
+                spaceType = spaceType { }
+//                threadedGroup = threadedGroup { }
+                flatGroup = flatGroup { }
+            }
+        }
+        val raw = this.pbRequest("create_group", request)
+        val response = CreateGroupResponse.parseFrom(ByteString.copyFrom(raw))
+        return response.group.groupId
     }
 
     private fun pbRequest(name: String, request: GeneratedMessageV3) : ByteArray? {
