@@ -191,8 +191,8 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
     }
 
     public fun getAliasLocalpartForId(chatId: GroupId): String {
-        return if (chatId.spaceIdOrNull != null) "gchat_space_${chatId.spaceId.spaceId}"
-        else if (chatId.dmIdOrNull != null) "gchat_dm_${chatId.dmId.dmId}"
+        return if (chatId.spaceIdOrNull != null) "${HARDCODED_NAMESPACE_PREFIX}space_${chatId.spaceId.spaceId}"
+        else if (chatId.dmIdOrNull != null) "${HARDCODED_NAMESPACE_PREFIX}dm_${chatId.dmId.dmId}"
         else throw java.lang.RuntimeException("invalid chat ID: unknown type")
     }
 
