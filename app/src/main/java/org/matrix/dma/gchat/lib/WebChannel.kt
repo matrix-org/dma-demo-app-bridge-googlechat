@@ -14,6 +14,7 @@ import org.matrix.dma.gchat.proto.PingEvent
 import org.matrix.dma.gchat.proto.StreamEventsRequest
 import org.matrix.dma.gchat.proto.pingEvent
 import org.matrix.dma.gchat.proto.streamEventsRequest
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URLEncoder
 import java.nio.charset.Charset
@@ -23,6 +24,7 @@ class WebChannel(val gChat: GChat) {
     private var aid = 0
     private var ofs = 0
     private var cookies: MutableMap<String, String> = mutableMapOf()
+    private val buffer = ChunkBuffer()
 
     public fun register() {
         val url = "https://chat.google.com/webchannel/register".toHttpUrl().newBuilder()
@@ -102,8 +104,6 @@ class WebChannel(val gChat: GChat) {
         conn.connect()
         parseSetCookies(conn)
 
-        val firstRead = conn.inputStream.read()
-
         // we have something useful to do! (hopefully)
         val init = conn.headerFields["X-HTTP-Initial-Response"]
             ?: throw java.lang.RuntimeException("Should never happen: missing init header")
@@ -116,27 +116,7 @@ class WebChannel(val gChat: GChat) {
             this.ofs = 0
             this.sendMaps()
         }
-        aid = 3
-//        var chunker = ByteArray(1)
-//        chunker[0] = firstRead.toByte()
-//        val buf = ByteArray(1024)
-//        while(true) {
-//            val read = conn.inputStream.read(buf)
-//            if (read > 0) {
-//                val original = chunker
-//                chunker = ByteArray(original.size + read)
-//                for (i in original.indices) {
-//                    chunker[i] = original[i]
-//                }
-//                for (i in 0 until read) {
-//                    chunker[i + original.size] = buf[i]
-//                }
-//                // TODO: Is this even needed, or is it a sign we're doing something wrong with the stream?
-//                if (chunker.toString(Charset.forName("UTF-8")).contains("[\"close\"]")) {
-//                    conn.disconnect()
-//                }
-//            }
-//        }
+        this.handleChunks(conn.inputStream)
     }
 
     public fun sendMaps() {
@@ -214,20 +194,21 @@ class WebChannel(val gChat: GChat) {
         conn.connect()
         parseSetCookies(conn)
 
-        var chunker = ByteArray(0)
+        this.handleChunks(conn.inputStream)
+    }
+
+    private fun handleChunks(stream: InputStream) {
         val buf = ByteArray(1024)
         while(true) {
-            val read = conn.inputStream.read(buf)
+            val read = stream.read(buf)
             if (read > 0) {
-                val original = chunker
-                chunker = ByteArray(original.size + read)
-                for (i in original.indices) {
-                    chunker[i] = original[i]
+                this.buffer.addData(buf.slice(0 until read).toByteArray())
+                val chunk = this.buffer.readChunk()
+                if (chunk != null) {
+                    // Example: [[1,["noop"]]]
+                    Log.d("DMA", chunk)
+                    this.aid = JSONArray(chunk).getJSONArray(0).getInt(0) // TODO: Safer handling...
                 }
-                for (i in 0 until read) {
-                    chunker[i + original.size] = buf[i]
-                }
-                Log.d("DMA-D", chunker.toString(Charset.forName("UTF-8")))
             }
         }
     }

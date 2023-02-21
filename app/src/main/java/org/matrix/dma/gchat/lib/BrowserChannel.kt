@@ -2,7 +2,6 @@ package org.matrix.dma.gchat.lib
 
 import android.util.Base64
 import android.util.Log
-import com.google.protobuf.ByteString
 import com.google.protobuf.GeneratedMessageV3
 import okhttp3.*
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -11,7 +10,6 @@ import org.json.JSONObject
 import org.matrix.dma.gchat.proto.*
 import java.io.BufferedInputStream
 import java.net.HttpURLConnection
-import java.net.URL
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
 
@@ -114,7 +112,7 @@ class BrowserChannel(val gchat: GChat) {
                 val read = stream.read(buf)
                 if (read > 0) {
                     this.chunks.addData(buf.sliceArray(0 until read))
-                    this.chunks.removeChunks()
+                    this.chunks.readChunk()
                     val str = this.chunks.buf.toString(Charset.forName("UTF-8"))
 //                    if (str.contains("[[2,[\"close\"]]]")) {
 //                        return
