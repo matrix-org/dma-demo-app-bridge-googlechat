@@ -31,11 +31,14 @@ class GChat(public var token: DynamiteToken) {
     val ch = WebChannel(this) // Second attempt at implementation
 
     public fun startLoop() {
-        return; // Disabled for ease of development
+//        return; // Disabled for ease of development
         Thread {
 //            this.channel.start()
             this.ch.register()
             this.ch.fetchSessionId()
+            while (true) {
+                this.ch.doLongPoll()
+            }
         }.start()
     }
 

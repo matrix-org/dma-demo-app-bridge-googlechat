@@ -21,6 +21,7 @@ class WebChannel(val gChat: GChat) {
     private var sid: String? = null
     private var aid = 0
     private var ofs = 0
+    private var cookies: MutableMap<String, String> = mutableMapOf()
 
     public fun register() {
         val url = "https://chat.google.com/webchannel/register".toHttpUrl().newBuilder()
@@ -31,13 +32,18 @@ class WebChannel(val gChat: GChat) {
         conn.setRequestProperty("Content-Type", "application/x-protobuf")
 //        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/36.0  Mobile/15E148 Safari/605.1.15")
 //        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36")
-        conn.connect()
 
-        Log.d("DMA-R", conn.inputStream.readAllBytes().toString(Charset.forName("UTF-8")))
+        addCookiesToRequest(conn)
+        conn.connect()
+        parseSetCookies(conn)
+
+//        Log.d("DMA-R", conn.inputStream.readAllBytes().toString(Charset.forName("UTF-8")))
 
         if (conn.responseCode != 200) {
             throw java.lang.RuntimeException("Failed to register with WebChannel")
         }
+
+        // no cookie is set for mautrix-googlechat
 
         // TODO: Is there supposed to be a cookie here?
         // conn.headerFields["Set-Cookie"]
@@ -57,19 +63,43 @@ class WebChannel(val gChat: GChat) {
          */
     }
 
+    private fun parseSetCookies(conn: HttpURLConnection) {
+        val setCookieHeaders = conn.headerFields["Set-Cookie"]
+
+        if (setCookieHeaders == null) {
+            return
+        }
+        for (cookieHeader in setCookieHeaders) {
+            val cookieName = cookieHeader.split("=")[0]
+            val cookieValue = cookieHeader.substring(cookieName.length + 1).split(";")[0]
+            cookies.put(cookieName, cookieValue)
+        }
+    }
+
+    private fun addCookiesToRequest(conn: HttpURLConnection) {
+        for (cookie in cookies) {
+            conn.addRequestProperty("Cookie", "${cookie.key}=${cookie.value}")
+        }
+    }
+
     public fun fetchSessionId() {
         val url = "https://chat.google.com/webchannel/events_encoded".toHttpUrl().newBuilder()
             .addQueryParameter("VER", "8")
-            .addQueryParameter("RID", "0")
             .addQueryParameter("CVER", "22")
-            .addQueryParameter("TYPE", "init")
-            .addQueryParameter("$" + "req", "count=1")
-            .addQueryParameter("SID", "null")
+            .addQueryParameter("AID", "0")
             .addQueryParameter("t", "1")
+            .addQueryParameter("$" + "req", "count=0")
+            .addQueryParameter("RID", "0")
+            .addQueryParameter("SID", "null")
+            .addQueryParameter("TYPE", "init")
         val conn = url.build().toUrl().openConnection() as HttpURLConnection
         conn.requestMethod = "GET"
         conn.setRequestProperty("Authorization", "Bearer ${this.gChat.token.accessToken}")
+        conn.setRequestProperty("Accept", "*/*")
+
+        addCookiesToRequest(conn)
         conn.connect()
+        parseSetCookies(conn)
 
         val firstRead = conn.inputStream.read()
 
@@ -85,28 +115,27 @@ class WebChannel(val gChat: GChat) {
             this.ofs = 0
             this.sendMaps()
         }
-
-        var chunker = ByteArray(1)
-        chunker[0] = firstRead.toByte()
-        val buf = ByteArray(1024)
-        while(true) {
-            val read = conn.inputStream.read(buf)
-            if (read > 0) {
-                val original = chunker
-                chunker = ByteArray(original.size + read)
-                for (i in original.indices) {
-                    chunker[i] = original[i]
-                }
-                for (i in 0 until read) {
-                    chunker[i + original.size] = buf[i]
-                }
-                // TODO: Is this even needed, or is it a sign we're doing something wrong with the stream?
-                if (chunker.toString(Charset.forName("UTF-8")).contains("[\"close\"]")) {
-                    conn.disconnect()
-                    this.doLongPoll()
-                }
-            }
-        }
+        aid = 3
+//        var chunker = ByteArray(1)
+//        chunker[0] = firstRead.toByte()
+//        val buf = ByteArray(1024)
+//        while(true) {
+//            val read = conn.inputStream.read(buf)
+//            if (read > 0) {
+//                val original = chunker
+//                chunker = ByteArray(original.size + read)
+//                for (i in original.indices) {
+//                    chunker[i] = original[i]
+//                }
+//                for (i in 0 until read) {
+//                    chunker[i + original.size] = buf[i]
+//                }
+//                // TODO: Is this even needed, or is it a sign we're doing something wrong with the stream?
+//                if (chunker.toString(Charset.forName("UTF-8")).contains("[\"close\"]")) {
+//                    conn.disconnect()
+//                }
+//            }
+//        }
     }
 
     public fun sendMaps() {
@@ -126,11 +155,13 @@ class WebChannel(val gChat: GChat) {
         val b64 = Base64.encodeToString(ev.toByteString().toByteArray(), Base64.DEFAULT)
         val url = "https://chat.google.com/webchannel/events_encoded".toHttpUrl().newBuilder()
             .addQueryParameter("VER", "8")
-            .addQueryParameter("RID", "1234")
+            .addQueryParameter("RID", "1")
+            .addQueryParameter("t", "1")
             .addQueryParameter("SID", this.sid)
             .addQueryParameter("AID", this.aid.toString())
             .addQueryParameter("CI", "0")
-            .addQueryParameter("t", "1")
+        // this has an extra \n in it:
+        // req0___data__: {"data": "EggIARgBKAEwAQ=="} vs req0___data__: {"data":"EggIARgBKAEwAQ==\n"}
         val form = FormBody.Builder()
             .add("count", "1")
             .add("ofs", this.ofs.toString())
@@ -141,13 +172,19 @@ class WebChannel(val gChat: GChat) {
         conn.requestMethod = "POST"
         conn.setRequestProperty("Authorization", "Bearer ${this.gChat.token.accessToken}")
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+
+        // need to set headers before we start writing the body
+        addCookiesToRequest(conn)
+
         for (i in 0 until form.size) {
             if (i > 0) conn.outputStream.write('&'.toInt())
             conn.outputStream.write(form.name(i).toByteArray(Charset.forName("UTF-8")))
             conn.outputStream.write('='.toInt())
             conn.outputStream.write(form.value(i).toByteArray(Charset.forName("UTF-8")))
         }
+
         conn.connect()
+        parseSetCookies(conn)
 
         // TODO: Even with a 200 OK, is this behaving correctly? Are we sending corrupt data?
         if (conn.responseCode != 200) {
@@ -159,16 +196,21 @@ class WebChannel(val gChat: GChat) {
         // TODO: Handle disconnect/timeout?
         val url = "https://chat.google.com/webchannel/events_encoded".toHttpUrl().newBuilder()
             .addQueryParameter("VER", "8")
+            .addQueryParameter("CVER", "22")
+            .addQueryParameter("AID", this.aid.toString())
+            .addQueryParameter("t", "1")
+            .addQueryParameter("CI", "0")
             .addQueryParameter("RID", "rpc")
             .addQueryParameter("SID", this.sid)
-            .addQueryParameter("AID", this.aid.toString())
-            .addQueryParameter("CI", "0")
-            .addQueryParameter("t", "1")
             .addQueryParameter("TYPE", "xmlhttp")
         val conn = url.build().toUrl().openConnection() as HttpURLConnection
         conn.requestMethod = "GET"
         conn.setRequestProperty("Authorization", "Bearer ${this.gChat.token.accessToken}")
+        conn.setRequestProperty("Accept", "*/*")
+
+        addCookiesToRequest(conn)
         conn.connect()
+        parseSetCookies(conn)
 
         var chunker = ByteArray(0)
         val buf = ByteArray(1024)
