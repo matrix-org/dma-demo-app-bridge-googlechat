@@ -10,7 +10,9 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import org.matrix.dma.gchat.proto.GroupId
 import org.matrix.dma.gchat.proto.Message
+import org.matrix.dma.gchat.proto.MessageEvent
 import org.matrix.dma.gchat.proto.PingEvent
 import org.matrix.dma.gchat.proto.StreamEventsRequest
 import org.matrix.dma.gchat.proto.StreamEventsResponse
@@ -27,6 +29,8 @@ class WebChannel(val gChat: GChat) {
     private var ofs = 0
     private var cookies: MutableMap<String, String> = mutableMapOf()
     private val buffer = ChunkBuffer()
+
+    public var onTextMessage: ((e: MessageEvent, groupId: GroupId) -> Unit)? = null
 
     public fun register() {
         // for easy testing
@@ -268,7 +272,14 @@ class WebChannel(val gChat: GChat) {
         // the aid should be set to the most recent PDU
     }
 
-    fun handleStreamEventsResponse(it: StreamEventsResponse) {
-        Log.d("handleStreamEventsResponse", "Got response: ${it}")
+    private fun handleStreamEventsResponse(it: StreamEventsResponse) {
+        Log.d("handleStreamEventsResponse", "Got response: $it")
+        if (!it.hasEvent() || it.event.bodiesCount < 1 || this.onTextMessage == null) return
+        for (i in 0 until it.event.bodiesCount) {
+            val body = it.event.getBodies(i)
+            if (body.hasMessagePosted()) {
+                this.onTextMessage!!(body.messagePosted, it.event.groupId)
+            }
+        }
     }
 }

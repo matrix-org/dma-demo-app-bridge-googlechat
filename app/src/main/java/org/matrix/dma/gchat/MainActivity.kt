@@ -275,6 +275,33 @@ class MainActivity : AppCompatActivity() {
             this.matrix!!.accessToken = oldAccessToken
 
             txtStatus.text = resources.getString(R.string.syncing_gchat)
+            this.gchat!!.ch.onTextMessage = { ev, groupId ->
+                val senderId = ev.message.creator.userId
+                val text = ev.message.textBody
+
+                val roomId = this.matrix!!.findRoomByChatId(groupId)
+                if (roomId == null) {
+                    Log.w("DMA", "Got message ${ev.message.id} from $senderId but no bridged room - ignoring")
+                } else {
+                    if (senderId.equals(myId)) {
+                        this.matrix!!.sendEvent(this.mxCrypto!!.encryptEvent(this.matrix!!.makeTextEvent(text), roomId), roomId)
+                    } else {
+                        val mxid = this.matrix!!.userIdForRemoteId(senderId.id)
+                        val tempAccessToken = prefs.getString(mxid, null)
+                        val tempClient: Matrix
+                        if (tempAccessToken == null) {
+                            tempClient = this.matrix!!.appserviceLogin(mxid)
+                            prefs.edit().putString(mxid, tempClient.accessToken!!).commit()
+                        } else {
+                            tempClient = Matrix(tempAccessToken, this.matrix!!.homeserverUrl, this.matrix!!.asToken)
+                        }
+                        val tempCrypto = MatrixCrypto(tempClient, applicationInfo.dataDir + "/appservice_users/" + tempClient.getLocalpart())
+                        tempCrypto.runOnce()
+                        tempClient.sendEvent(tempCrypto.encryptEvent(tempClient.makeTextEvent(text), roomId), roomId)
+                        tempCrypto.cleanup()
+                    }
+                }
+            }
             this.gchat!!.startLoop()
 
             txtStatus.text = resources.getString(R.string.syncing_matrix)
