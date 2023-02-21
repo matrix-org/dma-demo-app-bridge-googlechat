@@ -74,8 +74,7 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
     public fun getLocalpart(): String? {
         val whoami = this.whoAmI() ?: return null
 
-        val parts = whoami.split(":")
-        return parts[0].substring(1)
+        return extractLocalpart(whoami)
     }
 
     public fun ensureRegistered(): String? {
@@ -426,6 +425,13 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
                 }
             }
         }.start()
+    }
+
+    companion object {
+        public fun extractLocalpart(id: String): String {
+            val parts = id.split(":")
+            return parts[0].substring(1)
+        }
     }
 }
 
