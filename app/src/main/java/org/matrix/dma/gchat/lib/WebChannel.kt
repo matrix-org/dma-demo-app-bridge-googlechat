@@ -31,21 +31,17 @@ class WebChannel(val gChat: GChat) {
         conn.requestMethod = "POST"
         conn.setRequestProperty("Authorization", "Bearer ${this.gChat.token.accessToken}")
         conn.setRequestProperty("Content-Type", "application/x-protobuf")
-        //        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/36.0  Mobile/15E148 Safari/605.1.15")
-        //        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36")
+//        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/36.0  Mobile/15E148 Safari/605.1.15")
+//        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36")
 
-        try {
-            addCookiesToRequest(conn)
-            conn.connect()
-            parseSetCookies(conn)
+        addCookiesToRequest(conn)
+        conn.connect()
+        parseSetCookies(conn)
 
-            //        Log.d("DMA-R", conn.inputStream.readAllBytes().toString(Charset.forName("UTF-8")))
+//        Log.d("DMA-R", conn.inputStream.readAllBytes().toString(Charset.forName("UTF-8")))
 
-            if (conn.responseCode != 200) {
-                throw java.lang.RuntimeException("Failed to register with WebChannel")
-            }
-        } finally {
-            conn.disconnect()
+        if (conn.responseCode != 200) {
+            throw java.lang.RuntimeException("Failed to register with WebChannel")
         }
 
         // no cookie is set for mautrix-googlechat
@@ -98,34 +94,29 @@ class WebChannel(val gChat: GChat) {
             .addQueryParameter("SID", "null")
             .addQueryParameter("TYPE", "init")
         val conn = url.build().toUrl().openConnection() as HttpURLConnection
-
         conn.requestMethod = "GET"
         conn.setRequestProperty("Authorization", "Bearer ${this.gChat.token.accessToken}")
         conn.setRequestProperty("Accept", "*/*")
 
-        try {
-            addCookiesToRequest(conn)
-            conn.connect()
-            parseSetCookies(conn)
+        addCookiesToRequest(conn)
+        conn.connect()
+        parseSetCookies(conn)
 
-            val firstRead = conn.inputStream.read()
+        val firstRead = conn.inputStream.read()
 
-            // we have something useful to do! (hopefully)
-            val init = conn.headerFields["X-HTTP-Initial-Response"]
-                ?: throw java.lang.RuntimeException("Should never happen: missing init header")
+        // we have something useful to do! (hopefully)
+        val init = conn.headerFields["X-HTTP-Initial-Response"]
+            ?: throw java.lang.RuntimeException("Should never happen: missing init header")
 
-            val arr = JSONArray(init[0])
-            val sid = arr.getJSONArray(0).getJSONArray(1).getString(1)
-            if (this.sid != sid) {
-                this.sid = sid
-                this.aid = 0
-                this.ofs = 0
-                this.sendMaps()
-            }
-            aid = 3
-        } finally {
-            conn.disconnect()
+        val arr = JSONArray(init[0])
+        val sid = arr.getJSONArray(0).getJSONArray(1).getString(1)
+        if (this.sid != sid) {
+            this.sid = sid
+            this.aid = 0
+            this.ofs = 0
+            this.sendMaps()
         }
+        aid = 3
 //        var chunker = ByteArray(1)
 //        chunker[0] = firstRead.toByte()
 //        val buf = ByteArray(1024)
@@ -179,31 +170,27 @@ class WebChannel(val gChat: GChat) {
             .build()
         this.ofs++
         val conn = url.build().toUrl().openConnection() as HttpURLConnection
-        try {
-            conn.requestMethod = "POST"
-            conn.setRequestProperty("Authorization", "Bearer ${this.gChat.token.accessToken}")
-            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-            conn.setRequestProperty("Accept", "*/*")
+        conn.requestMethod = "POST"
+        conn.setRequestProperty("Authorization", "Bearer ${this.gChat.token.accessToken}")
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+        conn.setRequestProperty("Accept", "*/*")
 
-            // need to set headers before we start writing the body
-            addCookiesToRequest(conn)
+        // need to set headers before we start writing the body
+        addCookiesToRequest(conn)
 
-            for (i in 0 until form.size) {
-                if (i > 0) conn.outputStream.write('&'.toInt())
-                conn.outputStream.write(form.name(i).toByteArray(Charset.forName("UTF-8")))
-                conn.outputStream.write('='.toInt())
-                conn.outputStream.write(form.value(i).toByteArray(Charset.forName("UTF-8")))
-            }
+        for (i in 0 until form.size) {
+            if (i > 0) conn.outputStream.write('&'.toInt())
+            conn.outputStream.write(form.name(i).toByteArray(Charset.forName("UTF-8")))
+            conn.outputStream.write('='.toInt())
+            conn.outputStream.write(form.value(i).toByteArray(Charset.forName("UTF-8")))
+        }
 
-            conn.connect()
-            parseSetCookies(conn)
+        conn.connect()
+        parseSetCookies(conn)
 
-            // TODO: Even with a 200 OK, is this behaving correctly? Are we sending corrupt data?
-            if (conn.responseCode != 200) {
-                throw java.lang.RuntimeException("Failed to ping WebChannel")
-            }
-        } finally {
-            conn.disconnect()
+        // TODO: Even with a 200 OK, is this behaving correctly? Are we sending corrupt data?
+        if (conn.responseCode != 200) {
+            throw java.lang.RuntimeException("Failed to ping WebChannel")
         }
     }
 
@@ -219,35 +206,29 @@ class WebChannel(val gChat: GChat) {
             .addQueryParameter("SID", this.sid)
             .addQueryParameter("TYPE", "xmlhttp")
         val conn = url.build().toUrl().openConnection() as HttpURLConnection
-        try {
-            conn.requestMethod = "GET"
-            conn.setRequestProperty("Authorization", "Bearer ${this.gChat.token.accessToken}")
-            conn.setRequestProperty("Accept", "*/*")
+        conn.requestMethod = "GET"
+        conn.setRequestProperty("Authorization", "Bearer ${this.gChat.token.accessToken}")
+        conn.setRequestProperty("Accept", "*/*")
 
-            addCookiesToRequest(conn)
-            conn.connect()
-            parseSetCookies(conn)
+        addCookiesToRequest(conn)
+        conn.connect()
+        parseSetCookies(conn)
 
-            var chunker = ByteArray(0)
-            val buf = ByteArray(1024)
-            while (true) {
-                val read = conn.inputStream.read(buf)
-                if (read > 0) {
-                    val original = chunker
-                    chunker = ByteArray(original.size + read)
-                    for (i in original.indices) {
-                        chunker[i] = original[i]
-                    }
-                    for (i in 0 until read) {
-                        chunker[i + original.size] = buf[i]
-                    }
-                    Log.d("DMA-D", chunker.toString(Charset.forName("UTF-8")))
-                } else {
-                    break
+        var chunker = ByteArray(0)
+        val buf = ByteArray(1024)
+        while(true) {
+            val read = conn.inputStream.read(buf)
+            if (read > 0) {
+                val original = chunker
+                chunker = ByteArray(original.size + read)
+                for (i in original.indices) {
+                    chunker[i] = original[i]
                 }
+                for (i in 0 until read) {
+                    chunker[i + original.size] = buf[i]
+                }
+                Log.d("DMA-D", chunker.toString(Charset.forName("UTF-8")))
             }
-        } finally {
-            conn.disconnect()
         }
     }
 }
