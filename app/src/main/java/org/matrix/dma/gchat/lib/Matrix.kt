@@ -1,12 +1,11 @@
 package org.matrix.dma.gchat.lib
 
 import android.util.Log
-import org.json.JSONObject
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
+import org.json.JSONObject
 import org.matrix.dma.gchat.proto.GroupId
-import org.matrix.dma.gchat.proto.UserId
 import org.matrix.dma.gchat.proto.dmIdOrNull
 import org.matrix.dma.gchat.proto.spaceIdOrNull
 import java.util.*
@@ -246,7 +245,7 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
         )
     }
 
-    public fun getJoinedUsers(roomId: String): List<String>? {
+    public fun getJoinedUsers(roomId: String): List<String> {
         val req = Request.Builder()
             .url("${this.homeserverUrl}/_matrix/client/v3/rooms/$roomId/joined_members${this.getImpersonationQuery("?")}")
             .addHeader("Authorization", "Bearer ${this.accessToken}")

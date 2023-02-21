@@ -2,7 +2,6 @@ package org.matrix.dma.gchat
 
 import android.content.ContentValues
 import android.content.Intent
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Handler
 import android.provider.MediaStore
@@ -12,14 +11,15 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import org.json.JSONObject
 import org.matrix.dma.gchat.lib.*
+import org.matrix.dma.gchat.proto.*
 import java.security.SecureRandom
 import java.util.*
-import org.json.JSONObject
-import org.matrix.dma.gchat.proto.*
 
 // Buckets
-const val PREF_TOKEN = "token" // Matrix
+const val PREF_TOKEN = "token" // Matrix or Google tokens
 const val PREF_DYNAMITE = "dynamite"
 const val PREF_HOMESERVER = "homeserver"
 
@@ -113,9 +113,6 @@ class MainActivity : AppCompatActivity() {
         // At this stage, we should be able to set up a GChat client
         this.gchat = GChat(this.readDynamiteToken()!!)
 
-//        moveToBridgeSync()
-//        return
-
         // Quickly make sure we're not having to skip a step
         val hsPrefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE);
         if (hsPrefs.getString(PREF_ACCESS_TOKEN, null) !== null) {
@@ -140,19 +137,18 @@ class MainActivity : AppCompatActivity() {
                 .putString(PREF_APPSERVICE_TOKEN, asToken)
                 .commit()
 
-            Log.d("foo", "id: googlechat\nas_token: '$asToken'\nhs_token: '$hsToken'\nurl: null\nrate_limited: false\nsender_localpart: gchat_bot\nnamespaces:\n  users: [{exclusive: true, regex: '@gchat_.+'}, {exclusive: false, regex: '@$HARDCODED_LOCALPART:.+'}]\n  aliases: [{exclusive: true, regex: '#gchat_.+'}]\n  rooms: []\n")
-//            val uri = contentResolver.insert(MediaStore.Files.getContentUri("external"), attributes)!!
-//            val stream = contentResolver.openOutputStream(uri)!!
-//            stream.write("id: googlechat\nas_token: '$asToken'\nhs_token: '$hsToken'\nurl: null\nrate_limited: false\nsender_localpart: gchat_bot\nnamespaces:\n  users: [{exclusive: true, regex: '@gchat_.+'}, {exclusive: false, regex: '@$HARDCODED_LOCALPART:.+'}]\n  aliases: [{exclusive: true, regex: '#gchat_.+'}]\n  rooms: []\n".toByteArray())
-//            stream.close()
-//
-//            val shareIntent = Intent.createChooser(Intent().apply {
-//                action = Intent.ACTION_SEND
-//                putExtra(Intent.EXTRA_STREAM, uri)
-//                putExtra(Intent.EXTRA_SUBJECT, "googlechat.yaml")
-//                type = "text/plain"
-//            }, null)
-//            startActivity(shareIntent)
+            val uri = contentResolver.insert(MediaStore.Files.getContentUri("external"), attributes)!!
+            val stream = contentResolver.openOutputStream(uri)!!
+            stream.write("id: googlechat\nas_token: '$asToken'\nhs_token: '$hsToken'\nurl: null\nrate_limited: false\nsender_localpart: gchat_bot\nnamespaces:\n  users: [{exclusive: true, regex: '@gchat_.+'}, {exclusive: false, regex: '@$HARDCODED_LOCALPART:.+'}]\n  aliases: [{exclusive: true, regex: '#gchat_.+'}]\n  rooms: []\n".toByteArray())
+            stream.close()
+
+            val shareIntent = Intent.createChooser(Intent().apply {
+                action = Intent.ACTION_SEND
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "googlechat.yaml")
+                type = "text/plain"
+            }, null)
+            startActivity(shareIntent)
 
             moveToAppserviceTest()
         }

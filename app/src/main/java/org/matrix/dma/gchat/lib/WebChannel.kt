@@ -1,23 +1,12 @@
 package org.matrix.dma.gchat.lib
 
-import android.annotation.SuppressLint
 import android.util.Base64
 import android.util.Log
 import okhttp3.FormBody
-import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
-import org.matrix.dma.gchat.proto.GroupId
-import org.matrix.dma.gchat.proto.Message
-import org.matrix.dma.gchat.proto.MessageEvent
-import org.matrix.dma.gchat.proto.PingEvent
-import org.matrix.dma.gchat.proto.StreamEventsRequest
-import org.matrix.dma.gchat.proto.StreamEventsResponse
-import org.matrix.dma.gchat.proto.pingEvent
-import org.matrix.dma.gchat.proto.streamEventsRequest
+import org.matrix.dma.gchat.proto.*
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URLEncoder

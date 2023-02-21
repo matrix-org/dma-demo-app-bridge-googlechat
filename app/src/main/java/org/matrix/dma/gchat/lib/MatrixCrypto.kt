@@ -6,12 +6,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.matrix.rustcomponents.sdk.crypto.*
 
-class MatrixCrypto {
-    private val client: Matrix
+class MatrixCrypto(private val client: Matrix, storagePath: String) {
     private val machine: OlmMachine
 
-    constructor(client: Matrix, storagePath: String) {
-        this.client = client
+    init {
         this.machine = OlmMachine(this.client.whoAmI()!!, this.client.whichDeviceAmI()!!, storagePath, null)
     }
 
@@ -101,7 +99,7 @@ class MatrixCrypto {
 
     public fun encryptEvent(event: MatrixEvent, roomId: String): MatrixEvent {
         this.runOnce()
-        val users = this.client.getJoinedUsers(roomId)!!
+        val users = this.client.getJoinedUsers(roomId)
         this.machine.updateTrackedUsers(users)
         val req = this.machine.getMissingSessions(users)
         if (req != null) {

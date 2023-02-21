@@ -1,13 +1,15 @@
 package org.matrix.dma.gchat.lib
 
 import android.util.Log
-import okhttp3.*
+import okhttp3.JavaNetCookieJar
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.net.CookieManager
 import java.net.CookiePolicy
-import java.util.Date
+import java.util.*
 import java.util.concurrent.TimeUnit
 
 const val CLIENT_ID = "936475272427.apps.googleusercontent.com"
@@ -19,7 +21,7 @@ val SCOPES = arrayOf(
 const val REQUEST_URL = "https://accounts.google.com/o/oauth2/token"
 val LOGIN_URL = "https://accounts.google.com/o/oauth2/programmatic_auth?client_id=$CLIENT_ID&device_name=DMA_Bridge&scope=" + SCOPES.joinToString("+")
 
-inline fun makeCookieManager(): CookieManager {
+fun makeCookieManager(): CookieManager {
     return CookieManager(null, CookiePolicy.ACCEPT_ALL)
 }
 val HTTP_CLIENT = OkHttpClient.Builder().cookieJar(JavaNetCookieJar(makeCookieManager()))
