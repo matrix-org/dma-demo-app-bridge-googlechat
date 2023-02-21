@@ -294,7 +294,7 @@ class MainActivity : AppCompatActivity() {
                     val displayName = senderInfo.optString("displayname")
                     text = (if (displayName.isNotEmpty()) "<$displayName>: " else  "<${ev.getString("sender")}>: ") + text
                 }
-                this.gchat?.sendMessage(chatId, text)
+                this.gchat?.sendMessage(chatId, text, ev.getString("event_id"))
             }, { roomId, state ->
                 var mxName = "NoNameRoom"
                 for (i in 0 until state.length()) {

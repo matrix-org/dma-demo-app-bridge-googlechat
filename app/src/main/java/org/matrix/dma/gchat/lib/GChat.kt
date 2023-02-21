@@ -13,6 +13,7 @@ import java.util.*
 
 const val CHAT_API_URL = "https://chat.google.com"
 const val CHAT_API_KEY = "AIzaSyD7InnYR3VKdb4j2rMUEbTCIr2VyEazl6k"
+const val MAGIC_MX_IGNORE_PREFIX = "mxDoNotReplicate_"
 val PROTOBUF = "application/x-protobuf".toMediaType()
 
 val CHAT_REQUEST_HEADER = requestHeader {
@@ -76,11 +77,11 @@ class GChat(public var token: DynamiteToken) {
         return response.membershipsList
     }
 
-    public fun sendMessage(id: GroupId, text: String) {
+    public fun sendMessage(id: GroupId, text: String, mxEventId: String) {
         val request = createTopicRequest {
             requestHeader = CHAT_REQUEST_HEADER
             groupId = id
-            localId = "${Date().time}-matrix"
+            localId = "${MAGIC_MX_IGNORE_PREFIX}_${mxEventId}_${Date().time}"
             textBody = text
             historyV2 = true
             messageInfo = messageInfo {

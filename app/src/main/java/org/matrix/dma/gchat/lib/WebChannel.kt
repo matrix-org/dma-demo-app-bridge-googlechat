@@ -252,6 +252,10 @@ class WebChannel(val gChat: GChat) {
         for (i in 0 until it.event.bodiesCount) {
             val body = it.event.getBodies(i)
             if (body.hasMessagePosted()) {
+                if (body.messagePosted.message.hasLocalId() && body.messagePosted.message.localId.startsWith(MAGIC_MX_IGNORE_PREFIX)) {
+                    Log.d("DMA", "Ignoring duplicate message (probably echo): ${body.messagePosted.message.localId}")
+                    continue
+                }
                 this.onTextMessage!!(body.messagePosted, it.event.groupId)
             }
         }
