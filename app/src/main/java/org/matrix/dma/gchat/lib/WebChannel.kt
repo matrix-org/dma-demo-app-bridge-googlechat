@@ -123,7 +123,7 @@ class WebChannel(val gChat: GChat) {
             }
             this.handleChunks(conn.inputStream)
         } finally {
-            conn.disconnect()
+            conn.inputStream?.close()
         }
     }
 
@@ -174,15 +174,15 @@ class WebChannel(val gChat: GChat) {
                 conn.outputStream.write(form.value(i).toByteArray(Charset.forName("UTF-8")))
             }
 
+            conn.outputStream.close()
             conn.connect()
             parseSetCookies(conn)
-
             // TODO: Even with a 200 OK, is this behaving correctly? Are we sending corrupt data?
             if (conn.responseCode != 200) {
                 throw java.lang.RuntimeException("Failed to ping WebChannel")
             }
         } finally {
-            conn.disconnect()
+            conn.inputStream?.close()
         }
     }
 
@@ -209,25 +209,34 @@ class WebChannel(val gChat: GChat) {
 
             this.handleChunks(conn.inputStream)
         } finally {
-            conn.disconnect()
+            conn.inputStream?.close()
         }
     }
 
     private fun handleChunks(stream: InputStream) {
         val buf = ByteArray(1024)
-        while(true) {
+        var streamEnded = false
+        var currentAid = this.aid
+        while (!streamEnded) {
+            Log.d("WebChannel", "Reading stream...")
             val read = stream.read(buf)
             if (read > 0) {
+                Log.d("WebChannel", "Adding ${read} bytes to buffer")
                 this.buffer.addData(buf.slice(0 until read).toByteArray())
 
                 var chunk = this.buffer.readChunk()
                 while (chunk != null) {
                     // Example: [[1,["noop"]]]
-                    Log.d("DMA", chunk)
                     this.aid = JSONArray(chunk).getJSONArray(0).getInt(0) // TODO: Safer handling...
+                    Log.d("WebChannel", "Got chunk: ${chunk} with chunk ID ${this.aid}")
                     chunk = this.buffer.readChunk()
                 }
+            } else if (read == -1) {
+                Log.d("WebChannel", "Stream closed having read ${this.aid - currentAid} chunks")
+                streamEnded = true
             }
+            // otherwise wait for more data
         }
+        // the aid should be set to the most recent PDU
     }
 }
