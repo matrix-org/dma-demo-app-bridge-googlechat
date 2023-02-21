@@ -15,6 +15,7 @@ import org.matrix.dma.gchat.proto.StreamEventsRequest
 import org.matrix.dma.gchat.proto.pingEvent
 import org.matrix.dma.gchat.proto.streamEventsRequest
 import java.net.HttpURLConnection
+import java.net.URLEncoder
 import java.nio.charset.Charset
 
 class WebChannel(val gChat: GChat) {
@@ -165,13 +166,14 @@ class WebChannel(val gChat: GChat) {
         val form = FormBody.Builder()
             .add("count", "1")
             .add("ofs", this.ofs.toString())
-            .add("req0___data__", JSONObject().put("data", b64).toString())
+            .add("req0___data__", URLEncoder.encode(JSONObject().put("data", b64).toString().replace("\\n", "")))
             .build()
         this.ofs++
         val conn = url.build().toUrl().openConnection() as HttpURLConnection
         conn.requestMethod = "POST"
         conn.setRequestProperty("Authorization", "Bearer ${this.gChat.token.accessToken}")
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+        conn.setRequestProperty("Accept", "*/*")
 
         // need to set headers before we start writing the body
         addCookiesToRequest(conn)
