@@ -219,11 +219,13 @@ class WebChannel(val gChat: GChat) {
             val read = stream.read(buf)
             if (read > 0) {
                 this.buffer.addData(buf.slice(0 until read).toByteArray())
-                val chunk = this.buffer.readChunk()
-                if (chunk != null) {
+
+                var chunk = this.buffer.readChunk()
+                while (chunk != null) {
                     // Example: [[1,["noop"]]]
                     Log.d("DMA", chunk)
                     this.aid = JSONArray(chunk).getJSONArray(0).getInt(0) // TODO: Safer handling...
+                    chunk = this.buffer.readChunk()
                 }
             }
         }
