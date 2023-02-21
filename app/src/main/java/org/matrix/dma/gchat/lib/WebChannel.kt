@@ -10,6 +10,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import org.matrix.dma.gchat.proto.Message
 import org.matrix.dma.gchat.proto.PingEvent
 import org.matrix.dma.gchat.proto.StreamEventsRequest
 import org.matrix.dma.gchat.proto.pingEvent
@@ -27,6 +28,12 @@ class WebChannel(val gChat: GChat) {
     private val buffer = ChunkBuffer()
 
     public fun register() {
+        // for easy testing
+//        val data = "CrwBCg8KDQoLQUFBQVRLTTh4Uk06EgiPtqGulaf9AhCf2ay0iaf9AkKUATKPAQqEAQovCiAiHhILWlVhdGFJQi01elUaDwoNCgtBQUFBVEtNOHhSTRILWlVhdGFJQi01elUSGQoXChUxMTE2NTg0MDc0MjQyOTU0NDgxMjUYj7ahrpWn/QIgj7ahrpWn/QJSBnRlc3QxMnILWlVhdGFJQi01elWSAQIIAaABAcABAsgBAuABASAAKAAwATgBYAYSJGNjOTBkN2RkLWI3ZGUtNDE1Ny1iZTljLTc2OTgxNTY5NjIzOQ=="
+//        Message.parseFrom(Base64.decode(data, Base64.DEFAULT)).let {
+//            Log.d("WebChannel", "Got message: ${it}")
+//        }
+
         val url = "https://chat.google.com/webchannel/register".toHttpUrl().newBuilder()
 //            .addQueryParameter("ignore_compass_cookie", "1") // from the web app
         val conn = url.build().toUrl().openConnection() as HttpURLConnection
@@ -149,11 +156,11 @@ class WebChannel(val gChat: GChat) {
             .addQueryParameter("SID", this.sid)
             .addQueryParameter("AID", this.aid.toString())
             .addQueryParameter("CI", "0")
-        // this has an extra \n in it:
-        // req0___data__: {"data": "EggIARgBKAEwAQ=="} vs req0___data__: {"data":"EggIARgBKAEwAQ==\n"}
         val form = FormBody.Builder()
             .add("count", "1")
             .add("ofs", this.ofs.toString())
+            // this has an extra \n in it so we strip it forcefully:
+            // req0___data__: {"data": "EggIARgBKAEwAQ=="} vs req0___data__: {"data":"EggIARgBKAEwAQ==\n"}
             .add("req0___data__", URLEncoder.encode(JSONObject().put("data", b64).toString().replace("\\n", "")))
             .build()
         this.ofs++
@@ -226,9 +233,25 @@ class WebChannel(val gChat: GChat) {
 
                 var chunk = this.buffer.readChunk()
                 while (chunk != null) {
-                    // Example: [[1,["noop"]]]
-                    this.aid = JSONArray(chunk).getJSONArray(0).getInt(0) // TODO: Safer handling...
+                    // Example chunk = [[1,["noop"]]]
+                    // [[4,[{"data":"CgRCAmAh"}]]]
+                    val withoutOuter = JSONArray(chunk).getJSONArray(0)
+                    // Example withoutOuter: 1,["noop"]
+                    // 4,[{"data":"CgRCAmAh"}]
+                    this.aid = withoutOuter.getInt(0) // TODO: Safer handling...
                     Log.d("WebChannel", "Got chunk: ${chunk} with chunk ID ${this.aid}")
+                    val payload = withoutOuter.getJSONArray(1).get(0)
+                    if (payload is String && payload == "noop") {
+                        // noop
+                    } else if (payload is JSONObject && payload.has("data")) {
+                        val data = payload.getString("data")
+                        Message.parseFrom(Base64.decode(data, Base64.DEFAULT)).let {
+                            Log.d("WebChannel", "Got message: ${it}")
+                        }
+                        Log.d("WebChannel", "Data PDU: ${data}")
+                    } else {
+                        Log.d("WebChannel", "Got unknown payload: ${payload}")
+                    }
                     chunk = this.buffer.readChunk()
                 }
             } else if (read == -1) {
