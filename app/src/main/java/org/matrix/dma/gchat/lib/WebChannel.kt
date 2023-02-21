@@ -13,6 +13,7 @@ import org.json.JSONObject
 import org.matrix.dma.gchat.proto.Message
 import org.matrix.dma.gchat.proto.PingEvent
 import org.matrix.dma.gchat.proto.StreamEventsRequest
+import org.matrix.dma.gchat.proto.StreamEventsResponse
 import org.matrix.dma.gchat.proto.pingEvent
 import org.matrix.dma.gchat.proto.streamEventsRequest
 import java.io.InputStream
@@ -29,8 +30,12 @@ class WebChannel(val gChat: GChat) {
 
     public fun register() {
         // for easy testing
+//        val data = "CgRCAmAh"
 //        val data = "CrwBCg8KDQoLQUFBQVRLTTh4Uk06EgiPtqGulaf9AhCf2ay0iaf9AkKUATKPAQqEAQovCiAiHhILWlVhdGFJQi01elUaDwoNCgtBQUFBVEtNOHhSTRILWlVhdGFJQi01elUSGQoXChUxMTE2NTg0MDc0MjQyOTU0NDgxMjUYj7ahrpWn/QIgj7ahrpWn/QJSBnRlc3QxMnILWlVhdGFJQi01elWSAQIIAaABAcABAsgBAuABASAAKAAwATgBYAYSJGNjOTBkN2RkLWI3ZGUtNDE1Ny1iZTljLTc2OTgxNTY5NjIzOQ=="
-//        Message.parseFrom(Base64.decode(data, Base64.DEFAULT)).let {
+//        StreamEventsResponse.parseFrom(Base64.decode(data, Base64.DEFAULT)).let {
+//            Log.d("WebChannel", "Got message: ${it}")
+//        }
+//        Message.newBuilder().mergeFrom(Base64.decode(data, Base64.DEFAULT)).build().let {
 //            Log.d("WebChannel", "Got message: ${it}")
 //        }
 
@@ -245,8 +250,8 @@ class WebChannel(val gChat: GChat) {
                         // noop
                     } else if (payload is JSONObject && payload.has("data")) {
                         val data = payload.getString("data")
-                        Message.parseFrom(Base64.decode(data, Base64.DEFAULT)).let {
-                            Log.d("WebChannel", "Got message: ${it}")
+                        StreamEventsResponse.parseFrom(Base64.decode(data, Base64.DEFAULT)).let {
+                            this.handleStreamEventsResponse(it)
                         }
                         Log.d("WebChannel", "Data PDU: ${data}")
                     } else {
@@ -261,5 +266,9 @@ class WebChannel(val gChat: GChat) {
             // otherwise wait for more data
         }
         // the aid should be set to the most recent PDU
+    }
+
+    fun handleStreamEventsResponse(it: StreamEventsResponse) {
+        Log.d("handleStreamEventsResponse", "Got response: ${it}")
     }
 }
