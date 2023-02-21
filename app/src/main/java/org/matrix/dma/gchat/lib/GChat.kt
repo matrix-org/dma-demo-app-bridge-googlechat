@@ -27,16 +27,13 @@ val CHAT_REQUEST_HEADER = requestHeader {
 }
 
 class GChat(public var token: DynamiteToken) {
-    val channel = BrowserChannel(this) // First attempt at implementation
     val ch = WebChannel(this) // Second attempt at implementation
 
     public fun startLoop() {
-//        return; // Disabled for ease of development
         Thread {
-//            this.channel.start()
             this.ch.register()
             this.ch.fetchSessionId()
-            while (true) {
+            while (true) { // TODO: Add a way to stop this madness
                 this.ch.doLongPoll()
             }
         }.start()
