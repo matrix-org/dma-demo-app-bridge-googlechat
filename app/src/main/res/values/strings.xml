@@ -19,8 +19,7 @@
     <string name="initial_sync_intro_header">Looks like everything\'s all set! One moment while the app bridges your accounts…</string>
     <string name="initial_sync_body">This could take a few minutes if you have lots of chats.</string>
     <string name="please_wait">Please Wait</string>
-    <string name="sync_from_google">Getting your spaces/DMs from Google Chat</string>
+    <string name="sync_from_remote">Getting your spaces/DMs from Google Chat</string>
     <string name="bridging_x_chats">Bridging %1$d chats</string>
-    <string name="syncing_gchat">Starting up the Google Chat sync loop…</string>
-    <string name="syncing_matrix">Starting up the Matrix sync loop…</string>
+    <string name="syncing">Starting up the Google Chat and Matrix sync loops…</string>
 </resources>

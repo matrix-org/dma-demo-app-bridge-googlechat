@@ -1,10 +1,8 @@
 package org.matrix.dma.gchat
 
-import android.content.ContentValues
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
-import android.provider.MediaStore
 import android.util.Log
 import android.view.View
 import android.widget.Button
@@ -15,10 +13,7 @@ import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONObject
 import org.matrix.dma.gchat.lib.*
 import org.matrix.dma.gchat.proto.*
-import java.security.SecureRandom
 import java.util.*
-import kotlin.io.path.Path
-import kotlin.io.path.exists
 
 // Buckets
 const val PREF_TOKEN = "token" // Matrix or Google tokens
@@ -36,13 +31,14 @@ const val PREF_HOMESERVER_URL = "homeserver_url"
 const val REFRESH_AT_MS_LEFT: Long = 60000
 
 class MainActivity : AppCompatActivity() {
-
     private val tokenTimer = Timer()
     private var gchat: GChat? = null
-    private var matrix: Matrix? = null
-    private var mxCrypto: MatrixCrypto? = null
+    private var myId: UserId? = null
+    internal var matrix: Matrix? = null
+    internal var mxCrypto: MatrixCrypto? = null
 
     override fun onDestroy() {
+        Log.d("DMA", "Destroying everything...")
         super.onDestroy()
         this.tokenTimer.cancel()
     }
@@ -68,7 +64,7 @@ class MainActivity : AppCompatActivity() {
                     this.refreshDynamite(token.accessToken)
 
                     Handler(this.mainLooper).post {
-                        this.moveToHomeserverSetup()
+                        moveToHomeserverSetup(this)
                         val thiz = this
                         this.tokenTimer.schedule(object : TimerTask() {
                             override fun run() {
@@ -101,7 +97,7 @@ class MainActivity : AppCompatActivity() {
         val prefs = this.getSharedPreferences(PREF_TOKEN, MODE_PRIVATE)
         if (prefs.getString(PREF_ACCESS_TOKEN, null) != null) {
             Log.d("DMA", "Starting refresh token loop - app started with token")
-            this.moveToHomeserverSetup()
+            moveToHomeserverSetup(this)
             val thiz = this
             this.tokenTimer.schedule(object : TimerTask() {
                 override fun run() {
@@ -111,235 +107,43 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun moveToHomeserverSetup() {
-        // At this stage, we should be able to set up a GChat client
+    internal fun createRemoteClient() {
         this.gchat = GChat(this.readDynamiteToken()!!)
-
-        // Quickly make sure we're not having to skip a step
-        val hsPrefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE);
-        if (hsPrefs.getString(PREF_ACCESS_TOKEN, null) !== null) {
-            moveToAppserviceTest();
-            return
-        }
-
-        setContentView(R.layout.homeserver_setup_layout)
-
-        val downloadRegistrationButton = findViewById<Button>(R.id.btnDownloadRegistration)
-        downloadRegistrationButton.setOnClickListener {
-            val attributes = ContentValues()
-            attributes.put(MediaStore.MediaColumns.DISPLAY_NAME, "googlechat.yaml")
-            attributes.put(MediaStore.MediaColumns.MIME_TYPE, "text/yaml")
-
-            val asToken = this.randomString(32)
-            val hsToken = this.randomString(32) // unused in the app
-
-            val prefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE)
-            prefs.edit()
-                .putString(PREF_ACCESS_TOKEN, asToken)
-                .putString(PREF_APPSERVICE_TOKEN, asToken)
-                .commit()
-
-            val uri = contentResolver.insert(MediaStore.Files.getContentUri("external"), attributes)!!
-            val stream = contentResolver.openOutputStream(uri)!!
-            stream.write("id: googlechat\nas_token: '$asToken'\nhs_token: '$hsToken'\nurl: null\nrate_limited: false\nsender_localpart: gchat_bot\nnamespaces:\n  users: [{exclusive: true, regex: '@gchat_.+'}, {exclusive: false, regex: '@$HARDCODED_LOCALPART:.+'}]\n  aliases: [{exclusive: true, regex: '#gchat_.+'}]\n  rooms: []\n".toByteArray())
-            stream.close()
-
-            val shareIntent = Intent.createChooser(Intent().apply {
-                action = Intent.ACTION_SEND
-                putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(Intent.EXTRA_SUBJECT, "googlechat.yaml")
-                type = "text/plain"
-            }, null)
-            startActivity(shareIntent)
-
-            moveToAppserviceTest()
-        }
     }
 
-    private fun moveToAppserviceTest() {
-        val hsPrefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE)
-        val hsStoredUrl = hsPrefs.getString(PREF_HOMESERVER_URL, null)
-        if (hsStoredUrl != null) {
-            moveToBridgeSync()
-            return
-        }
+    internal fun bridgeRemoteToMatrix() {
+        val txtStatus = this.findViewById<TextView>(R.id.txtStatus)
+        val toBridge = this.gchat!!.listDmsAndSpaces()
+        txtStatus.text = resources.getString(R.string.bridging_x_chats, toBridge.size)
+        this.myId = this.gchat!!.getSelfUserId()
+        for (gspace in toBridge) {
+            if (!gspace.hasGroupId()) continue
+            val roomId = getOrMakeRoom(this, gspace.groupId, gspace.roomName)
 
-        setContentView(R.layout.appservice_test_layout)
-
-        val hsUrlBox = findViewById<TextView>(R.id.txtHsUrl)
-        val testButton = findViewById<Button>(R.id.btnTestConnection)
-        testButton.setOnClickListener {
-            val hsUrl = hsUrlBox.text.toString()
-            if (hsUrl.trim().isEmpty()) {
-                Toast.makeText(this, R.string.toast_missing_homeserver_url, Toast.LENGTH_SHORT)
-                    .show()
-                return@setOnClickListener
-            }
-
-            Thread {
-                val prefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE)
-                val accessToken = prefs.getString(PREF_ACCESS_TOKEN, null)!!
-                val asToken = prefs.getString(PREF_APPSERVICE_TOKEN, accessToken)!!
-
-                val client = Matrix(accessToken, hsUrl, asToken)
-                try {
-                    val realAccessToken = client.ensureRegistered()
-                    client.accessToken = realAccessToken
-                    val whoami = client.whoAmI()
-                    if (whoami != null) {
-                        prefs.edit()
-                            .putString(PREF_HOMESERVER_URL, hsUrl)
-                            .putString(PREF_ACCESS_TOKEN, realAccessToken).commit()
-                    } else {
-                        this.showInvalidHomeserverUrlToast()
-                        return@Thread
-                    }
-                } catch (exception: java.lang.Exception) {
-                    this.showInvalidHomeserverUrlToast()
-                    return@Thread
-                }
-
-                Log.d("DMA", "Bridging as ${client.whoAmI()} (${client.whichDeviceAmI()}) / ${client.accessToken}")
-                Handler(this.mainLooper).post {
-                    moveToBridgeSync()
-                }
-            }.start()
-        }
-    }
-
-    private fun moveToBridgeSync() {
-        setContentView(R.layout.initial_sync_layout)
-
-        val prefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE)
-//        prefs.edit()
-//            .putString(PREF_HOMESERVER_URL, "http://172.16.0.111:8338")
-//            .putString(PREF_ACCESS_TOKEN, "syt_ZXhhbXBsZV91c2VyXzE2NzYwNjYxOTAxOTI_NEPqZQauibIQpOsxySNF_094Zhx")
-//            .putString(PREF_APPSERVICE_TOKEN, "5620tl97s4w28fqngt3u5zjb3g6ejr51")
-//            .commit()
-        val homeserverUrl = prefs.getString(PREF_HOMESERVER_URL, null)!!
-        val accessToken = prefs.getString(PREF_ACCESS_TOKEN, null)!!
-        val asToken = prefs.getString(PREF_APPSERVICE_TOKEN, accessToken)!!
-        this.matrix = Matrix(
-            accessToken,
-            homeserverUrl,
-            asToken,
-        )
-
-        val txtStatus = findViewById<TextView>(R.id.txtStatus)
-        txtStatus.text = resources.getText(R.string.sync_from_google)
-        Thread {
-            this.mxCrypto = MatrixCrypto(this.matrix!!, applicationInfo.dataDir + "/crypto")
-            this.mxCrypto!!.runOnce()
-
-            val oldActingId = this.matrix!!.actingUserId
-            val oldAccessToken = this.matrix!!.accessToken
-            this.matrix!!.actingUserId = this.matrix!!.whoAmI()
-            this.matrix!!.accessToken = asToken
-
-            val toBridge = this.gchat!!.listDmsAndSpaces()
-            txtStatus.text = resources.getString(R.string.bridging_x_chats, toBridge.size)
-            val myId = this.gchat!!.getSelfUserId()
-            for (gspace in toBridge) {
-                if (!gspace.hasGroupId()) continue
-                val existingRoomId = this.matrix!!.findRoomByChatId(gspace.groupId)
-                if (existingRoomId != null && existingRoomId.isNotEmpty()) {
-                    Log.d("DMA", "${gspace.groupId} already has room: $existingRoomId")
-                    continue
-                }
-                val roomId = this.matrix!!.createRoom(gspace.roomName, gspace.groupId)!!
-                val memberships = this.gchat!!.getChatMembers(gspace.groupId)
-                val joinedNotUs = memberships.toList().filter { m -> m.membershipState == MembershipState.MEMBER_JOINED && !m.id.memberId.userId.equals(myId) }
-                for (membership in joinedNotUs) {
-                    val member = this.gchat!!.getMember(membership.id.memberId)
-                    val mxid = this.matrix!!.createUser(member.user.userId.id, member.user.name)
-                    this.matrix!!.appserviceJoin(mxid, roomId)
-
-                    // Create the crypto stuff for that user too
-                    val tempUser = this.makeTempUser(mxid) // sets up crypto for us
-                    tempUser.crypto.cleanup()
-                }
-            }
-
-            this.matrix!!.actingUserId = oldActingId
-            this.matrix!!.accessToken = oldAccessToken
-
-            txtStatus.text = resources.getString(R.string.syncing_gchat)
-            this.gchat!!.ch.onTextMessage = { ev, groupId ->
-                val senderId = ev.message.creator.userId
-                val text = ev.message.textBody
-
-                val roomId = this.matrix!!.findRoomByChatId(groupId)
-                if (roomId == null) {
-                    Log.w("DMA", "Got message ${ev.message.id} from $senderId but no bridged room - ignoring")
-                } else {
-                    if (senderId.equals(myId)) {
-                        this.matrix!!.sendEvent(this.mxCrypto!!.encryptEvent(this.matrix!!.makeTextEvent(text), roomId), roomId)
-                    } else {
-                        val mxid = this.matrix!!.userIdForRemoteId(senderId.id)
-                        val tempUser = this.makeTempUser(mxid, roomId)
-                        tempUser.client.sendEvent(tempUser.crypto.encryptEvent(tempUser.client.makeTextEvent(text), roomId), roomId)
-                        tempUser.crypto.cleanup()
-                    }
-                }
-            }
-            this.gchat!!.startLoop()
-
-            txtStatus.text = resources.getString(R.string.syncing_matrix)
-            this.matrix!!.startSyncLoop(this.mxCrypto!!, { ev, id ->
-                Log.d("DMA", "Got message: $ev\n\n$id")
-                val chatId = this.stateIdToChatId(id)
-                val senderInfo = ev.getJSONObject("X-sender")
-                var text = ev.getJSONObject("content").getString("body")
-                if (senderInfo.getString("X-myUserId") != ev.getString("sender")) {
-                    val displayName = senderInfo.optString("displayname")
-                    text = (if (displayName.isNotEmpty()) "<$displayName>: " else  "<${ev.getString("sender")}>: ") + text
-                }
-                this.gchat?.sendMessage(chatId, text, ev.getString("event_id"))
-            }, { roomId, state ->
-                var mxName = "NoNameRoom"
-                for (i in 0 until state.length()) {
-                    val event = state.getJSONObject(i)
-                    if (event.getString("type") == "m.room.name") {
-                        mxName = event.getJSONObject("content").optString("name", "NoNameRoom")
-                        break
-                    }
-                }
-
-                if (mxName.isEmpty()) {
-                    mxName = roomId
-                }
-
-                Log.d("DMA", "Attempting to assign a new chat ID to $roomId ($mxName)")
-                val groupId = this.gchat!!.createSpace(mxName)
-                val content = JSONObject()
-                    .put("space_id", groupId.spaceIdOrNull?.spaceId)
-                    .put("dm_id", groupId.dmIdOrNull?.dmId)
-                this.matrix!!.assignChatIdToRoom(groupId, roomId)
-                this.matrix!!.sendStateEvent(roomId, MATRIX_NAMESPACE, "", content)
-                Log.d("DMA", "Assigned $groupId to $roomId")
-                return@startSyncLoop content
-            })
-        }.start()
-    }
-
-    private fun stateIdToChatId(id: JSONObject): GroupId {
-        val mxDmId = id.optString("dm_id")
-        val mxSpaceId = id.optString("space_id")
-        if (mxDmId.isNotEmpty()) {
-            return groupId {
-                dmId = dmId { dmId = mxDmId }
-            }
-        } else {
-            return groupId {
-                spaceId = spaceId { spaceId = mxSpaceId }
+            val memberships = this.gchat!!.getChatMembers(gspace.groupId)
+            val joinedNotUs = memberships.toList().filter { m -> m.membershipState == MembershipState.MEMBER_JOINED && !m.id.memberId.userId.equals(myId!!) }
+            for (membership in joinedNotUs) {
+                val member = this.gchat!!.getMember(membership.id.memberId)
+                bridgeUserTo(this, member.user.userId.id, roomId, member.user.name)
             }
         }
     }
 
-    private fun showInvalidHomeserverUrlToast() {
-        Handler(this.mainLooper).post {
-            Toast.makeText(this, R.string.toast_invalid_homeserver_url, Toast.LENGTH_SHORT).show()
+    internal fun setUpRemoteSync() {
+        this.gchat!!.ch.onTextMessage = { ev, groupId ->
+            val senderId = ev.message.creator.userId
+            val text = ev.message.textBody
+            sendMatrixMessage(this, ev.message.id.messageId, groupId, senderId.id, senderId.equals(myId!!), text)
         }
+        this.gchat!!.startLoop()
+    }
+
+    internal fun sendToRemote(chatId: ChatID, text: String, mxEventId: String) {
+        this.gchat?.sendMessage(chatId, text, mxEventId)
+    }
+
+    internal fun createRoomOnRemote(name: String): ChatID {
+        return this.gchat!!.createSpace(name)
     }
 
     private fun storeToken(token: Token) {
@@ -419,40 +223,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun randomString(length: Int) : String {
-        val random = SecureRandom()
-        val characters = "abcdefghijklmnopqrstuvwxyz0123456789"
-        val builder = StringBuilder()
-        for (i in 0 until length) {
-            builder.append(characters[random.nextInt(characters.length)])
-        }
-        return builder.toString()
-    }
-
-    private fun makeTempUser(mxid: String, roomId: String? = null): TempUser {
-        val prefs = getSharedPreferences(PREF_HOMESERVER, MODE_PRIVATE)
-        val accessToken = prefs.getString(mxid, null)
-        val localpart = Matrix.extractLocalpart(mxid)
-        val dataPath = applicationInfo.dataDir + "/appservice_users/" + localpart
-
-        val client: Matrix
-        if (accessToken == null || !Path(dataPath).exists()) {
-            client = Matrix(this.matrix!!.asToken, this.matrix!!.homeserverUrl, this.matrix!!.asToken)
-            client.actingUserId = mxid
-            client.accessToken = client.ensureRegistered()
-            client.actingUserId = null
-//            client = this.matrix!!.appserviceLogin(mxid)
-            prefs.edit().putString(mxid, client.accessToken!!).commit()
-        } else {
-            client = Matrix(accessToken, this.matrix!!.homeserverUrl, this.matrix!!.asToken)
-        }
-        if (roomId != null) {
-            this.matrix!!.appserviceJoin(mxid, roomId)
-        }
-        val crypto = MatrixCrypto(client, dataPath)
-        crypto.runOnce()
-        return TempUser(client, crypto)
-    }
 }
 
 data class TempUser(val client: Matrix, val crypto: MatrixCrypto)
