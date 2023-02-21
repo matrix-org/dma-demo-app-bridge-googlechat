@@ -335,7 +335,7 @@ class MainActivity : AppCompatActivity() {
                     .put("space_id", groupId.spaceIdOrNull?.spaceId)
                     .put("dm_id", groupId.dmIdOrNull?.dmId)
                 this.matrix!!.assignChatIdToRoom(groupId, roomId)
-//                this.matrix!!.sendStateEvent(roomId, MATRIX_NAMESPACE, "", content)
+                this.matrix!!.sendStateEvent(roomId, MATRIX_NAMESPACE, "", content)
                 Log.d("DMA", "Assigned $groupId to $roomId")
                 return@startSyncLoop content
             })

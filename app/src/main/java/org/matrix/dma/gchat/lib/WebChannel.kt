@@ -33,16 +33,6 @@ class WebChannel(val gChat: GChat) {
     public var onTextMessage: ((e: MessageEvent, groupId: GroupId) -> Unit)? = null
 
     public fun register() {
-        // for easy testing
-//        val data = "CgRCAmAh"
-//        val data = "CrwBCg8KDQoLQUFBQVRLTTh4Uk06EgiPtqGulaf9AhCf2ay0iaf9AkKUATKPAQqEAQovCiAiHhILWlVhdGFJQi01elUaDwoNCgtBQUFBVEtNOHhSTRILWlVhdGFJQi01elUSGQoXChUxMTE2NTg0MDc0MjQyOTU0NDgxMjUYj7ahrpWn/QIgj7ahrpWn/QJSBnRlc3QxMnILWlVhdGFJQi01elWSAQIIAaABAcABAsgBAuABASAAKAAwATgBYAYSJGNjOTBkN2RkLWI3ZGUtNDE1Ny1iZTljLTc2OTgxNTY5NjIzOQ=="
-//        StreamEventsResponse.parseFrom(Base64.decode(data, Base64.DEFAULT)).let {
-//            Log.d("WebChannel", "Got message: ${it}")
-//        }
-//        Message.newBuilder().mergeFrom(Base64.decode(data, Base64.DEFAULT)).build().let {
-//            Log.d("WebChannel", "Got message: ${it}")
-//        }
-
         val url = "https://chat.google.com/webchannel/register".toHttpUrl().newBuilder()
 //            .addQueryParameter("ignore_compass_cookie", "1") // from the web app
         val conn = url.build().toUrl().openConnection() as HttpURLConnection
@@ -57,15 +47,13 @@ class WebChannel(val gChat: GChat) {
             conn.connect()
             parseSetCookies(conn)
 
-            //        Log.d("DMA-R", conn.inputStream.readAllBytes().toString(Charset.forName("UTF-8")))
-
             if (conn.responseCode != 200) {
                 throw java.lang.RuntimeException("Failed to register with WebChannel")
             }
 
-            // no cookie is set for mautrix-googlechat
 
             // TODO: Is there supposed to be a cookie here?
+            // no cookie is set for mautrix-googlechat
             // conn.headerFields["Set-Cookie"]
 
             /*
@@ -203,7 +191,7 @@ class WebChannel(val gChat: GChat) {
     }
 
     public fun doLongPoll() {
-        // TODO: Handle disconnect/timeout?
+        Log.d("DMA", "Starting new longpoll request")
         val url = "https://chat.google.com/webchannel/events_encoded".toHttpUrl().newBuilder()
             .addQueryParameter("VER", "8")
             .addQueryParameter("CVER", "22")
@@ -232,12 +220,10 @@ class WebChannel(val gChat: GChat) {
     private fun handleChunks(stream: InputStream) {
         val buf = ByteArray(1024)
         var streamEnded = false
-        var currentAid = this.aid
+        val currentAid = this.aid
         while (!streamEnded) {
-            Log.d("WebChannel", "Reading stream...")
             val read = stream.read(buf)
             if (read > 0) {
-                Log.d("WebChannel", "Adding ${read} bytes to buffer")
                 this.buffer.addData(buf.slice(0 until read).toByteArray())
 
                 var chunk = this.buffer.readChunk()
@@ -248,7 +234,7 @@ class WebChannel(val gChat: GChat) {
                     // Example withoutOuter: 1,["noop"]
                     // 4,[{"data":"CgRCAmAh"}]
                     this.aid = withoutOuter.getInt(0) // TODO: Safer handling...
-                    Log.d("WebChannel", "Got chunk: ${chunk} with chunk ID ${this.aid}")
+                    Log.d("WebChannel", "Got chunk: $chunk with chunk ID ${this.aid}")
                     val payload = withoutOuter.getJSONArray(1).get(0)
                     if (payload is String && payload == "noop") {
                         // noop
@@ -257,9 +243,8 @@ class WebChannel(val gChat: GChat) {
                         StreamEventsResponse.parseFrom(Base64.decode(data, Base64.DEFAULT)).let {
                             this.handleStreamEventsResponse(it)
                         }
-                        Log.d("WebChannel", "Data PDU: ${data}")
                     } else {
-                        Log.d("WebChannel", "Got unknown payload: ${payload}")
+                        Log.d("WebChannel", "Got unknown payload: $payload")
                     }
                     chunk = this.buffer.readChunk()
                 }

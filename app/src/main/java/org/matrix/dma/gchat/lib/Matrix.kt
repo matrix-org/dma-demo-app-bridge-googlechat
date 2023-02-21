@@ -11,7 +11,7 @@ import org.matrix.dma.gchat.proto.dmIdOrNull
 import org.matrix.dma.gchat.proto.spaceIdOrNull
 import java.util.*
 
-public const val HARDCODED_LOCALPART = "hugh"
+public const val HARDCODED_LOCALPART = "demo"
 const val HARDCODED_NAMESPACE_PREFIX = "gchat_"
 const val MATRIX_NAMESPACE = "org.matrix.dma.gchat"
 
