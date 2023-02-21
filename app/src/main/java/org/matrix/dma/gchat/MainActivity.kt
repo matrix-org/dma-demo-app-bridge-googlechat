@@ -434,9 +434,14 @@ class MainActivity : AppCompatActivity() {
         val accessToken = prefs.getString(mxid, null)
         val localpart = Matrix.extractLocalpart(mxid)
         val dataPath = applicationInfo.dataDir + "/appservice_users/" + localpart
+
         val client: Matrix
         if (accessToken == null || !Path(dataPath).exists()) {
-            client = this.matrix!!.appserviceLogin(mxid)
+            client = Matrix(this.matrix!!.asToken, this.matrix!!.homeserverUrl, this.matrix!!.asToken)
+            client.actingUserId = mxid
+            client.accessToken = client.ensureRegistered()
+            client.actingUserId = null
+//            client = this.matrix!!.appserviceLogin(mxid)
             prefs.edit().putString(mxid, client.accessToken!!).commit()
         } else {
             client = Matrix(accessToken, this.matrix!!.homeserverUrl, this.matrix!!.asToken)

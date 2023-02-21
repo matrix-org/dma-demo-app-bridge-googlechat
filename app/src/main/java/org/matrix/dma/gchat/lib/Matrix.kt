@@ -84,7 +84,10 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
                 return this.accessToken
             }
 
+            val origActingUser = this.actingUserId
+            this.actingUserId = null
             val domain = this.getDomain()
+            this.actingUserId = origActingUser
 
             // Do an appservice registration
             var req = Request.Builder()
