@@ -72,15 +72,13 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
 
     public fun ensureRegistered(): String? {
         if (this.accessToken !== null) {
-            val whoami = this.whoAmI()
-            if (whoami != null && whoami.startsWith("@$HARDCODED_LOCALPART:")) {
-                return this.accessToken
-            }
-
             val origActingUser = this.actingUserId
             this.actingUserId = null
             val domain = this.getDomain()
             this.actingUserId = origActingUser
+
+            val targetUser = this.actingUserId ?: "@$HARDCODED_LOCALPART:$domain"
+            val targetLocalpart = extractLocalpart(targetUser)
 
             // Do an appservice registration
             var req = Request.Builder()
@@ -88,7 +86,7 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
                 .addHeader("Authorization", "Bearer ${this.accessToken}")
                 .post(JSONObject()
                     .put("type", "m.login.application_service")
-                    .put("username", HARDCODED_LOCALPART)
+                    .put("username", targetLocalpart)
                     .toString().toRequestBody(JSON)
                 )
                 .build()
@@ -102,7 +100,7 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
                         .put("type", "m.login.application_service")
                         .put("identifier", JSONObject()
                             .put("type", "m.id.user")
-                            .put("user", "@$HARDCODED_LOCALPART:$domain")
+                            .put("user", targetUser)
                         )
                         .toString().toRequestBody(JSON)
                     )
