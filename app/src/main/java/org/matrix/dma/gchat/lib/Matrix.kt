@@ -247,6 +247,7 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
 
     public fun doRequest(request: Request): JSONObject? {
         try {
+            Log.d("Matrix-outboundRequest", request.method + " " + request.url.toString())
             val response = HTTP_CLIENT.newCall(request).execute()
             return JSONObject(response.body!!.string())
         } catch (exception: Exception) {
@@ -361,16 +362,7 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
                 val rooms = res.optJSONObject("rooms")?.optJSONObject("join") ?: continue
                 for (roomId in rooms.keys()) {
                     val room = rooms.getJSONObject(roomId)
-                    val state = this.getRoomState(roomId)
                     var idEvent = this.getStateEvent(roomId, MATRIX_NAMESPACE, "")
-                    if (idEvent == null) {
-                        idEvent = onRoomCallback(roomId, state)
-                    }
-
-                    if (isFirstSync) {
-                        // Don't process messages yet (we'll happily drop whatever was missed if it means not spamming the chat)
-                        continue
-                    }
 
                     // XXX: We should probably handle gappy timelines, but meh
                     val timeline = room.getJSONObject("timeline").getJSONArray("events")
@@ -380,7 +372,9 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
                         if (flagged) continue // don't even bother trying to process this
 
                         val decrypted = if (roomEvent.getString("type") == "m.room.encrypted") crypto.decrypt(roomEvent, roomId) ?: roomEvent else roomEvent
-                        if (decrypted.getString("type") == "m.room.message") {
+
+                        // Note: We drop messages from the first sync so we don't spam the chat
+                        if (!isFirstSync && idEvent != null && decrypted.getString("type") == "m.room.message") {
                             if (decrypted.getJSONObject("content").getString("msgtype") == "m.text") {
                                 // It's a real message event - let's postprocess it a bit
                                 val senderId = roomEvent.getString("sender") // field exists on encrypted event
@@ -400,6 +394,16 @@ class Matrix(var accessToken: String?, val homeserverUrl: String, val asToken: S
                                 memberEvent.put("X-myUserId", myUserId)
                                 copiedEvent.put("X-sender", memberEvent) // for bridging purposes
                                 onMessageCallback(copiedEvent, idEvent)
+                            }
+                        } else if (decrypted.getString("type") == "m.room.name") {
+                            // This is a super sketchy hack: Synapse streams new rooms to us over `/sync`, which
+                            // can mean that we end up trying to bridge a room before Synapse has sent our ID state
+                            // event, thus bridging it *again*. However, by the time the room name is set, we have
+                            // all the information we need (including the ID event, if any) to bridge the room to the
+                            // remote service.
+                            if (idEvent == null) {
+                                idEvent = onRoomCallback(roomId, this.getRoomState(roomId))
+                                // idEvent might be useful for events not yet processed
                             }
                         }
                     }
